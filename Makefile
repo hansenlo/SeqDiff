@@ -14,10 +14,10 @@ variantFinder.o: variantFinder.cpp ReadCluster.h kmerAnalysis.h utilities.h
 ReadCluster.o: ReadCluster.cpp ReadCluster.h spooky.h
 	$(CC) $(CFLAGS) -c ReadCluster.cpp
 
-spooky.o: spooky.h
+spooky.o: spooky.h spooky.cpp
 	$(CC) $(CFLAGS) -c spooky.cpp
 
-kmerAnalysis.o: kmerAnalysis.h ReadCluster.h spooky.h
+kmerAnalysis.o: kmerAnalysis.cpp kmerAnalysis.h ReadCluster.h spooky.h
 	$(CC) $(CFLAGS) -c kmerAnalysis.cpp
 
 utilities.o: utilities.cpp utilities.h
