@@ -13,7 +13,6 @@
 //#include<math.h>
 #include<stdint.h>
 //#include <stddef.h>
-#include "spooky.h"
 //#include<stdio.h>
 //#include <iterator>
 #include<sstream>
@@ -23,21 +22,9 @@
 #include <iostream>
 #include<list>
 
+#include "utilities.h"
 
 
-
-
-struct customHash{
-
-  
-  size_t operator()(const unsigned long value ) const{
-
-
-    return size_t(SpookyHash::Hash64(&value, 8, 20));
-	       //return size_t(value);
-  }
-
-};
 
 
 
