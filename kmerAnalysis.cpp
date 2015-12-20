@@ -1774,7 +1774,7 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
   //creating and opening a set of output files to place clusters into
   for(i=0; i<numFiles; i++)
     {
-      line="/data/Temp/file"+to_string(i)+".dat";
+      line="/home/massa/Temp/file"+to_string(i)+".dat";
       
       //line="/data1/HEM0013-131-LYMPH.bam.aspera-env et al/Temp/"+to_string(i)+".dat";
       fileNames.push_back(line);
@@ -1786,7 +1786,7 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
   //ofstream uniqueOut("/data7/SeqDiffResults/Results/uniqueReads.fastq");
 
   //ofstream uniqueOut("/data1/HEM0013-131-LYMPH.bam.aspera-env et al/uniqueReads.fastq");
-  ofstream uniqueOut("/data5/MassaSequencing/AF_SOL_646/uniqueReads.fastq");
+    ofstream uniqueOut("/data/Sequencing/kmerAnalysis/uniqueReads.fastq");
 
 
 
@@ -1853,19 +1853,24 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
     }
   
   
-   getline(seqFile, line);
-   start=toupper(line[0]);
+   getline(seqFile, header);
+   start=toupper(header[0]);
 
-   header=line;
+   //header=line;
    
    fastq=false;
    if(start!='>')
      {
        fastq=true; 
+     
+       getline(seqFile, line);
+       getline(seqFile, tempLine);
+       getline(seqFile, qualityScore);
+
+    
      }
      
-
-
+   
 
    //################################33
 
@@ -1938,11 +1943,20 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
 
 		  
 		  totalCtr++;
-		  ctr++;
+		  //ctr++;
 
-      //read in every line of the sequence file
-		  getline(seqFile, line);
-		 
+		  if(fastq)
+		    {
+		      
+		      //read in an entire fastq record
+
+		      getline(seqFile, header);
+		      getline(seqFile, line);
+		      getline(seqFile, tempLine);
+		      getline(seqFile, qualityScore);
+
+		    }
+     		  
        
       //cout<<totalCtr<<endl;
       if(totalCtr % 10000000==0)
@@ -1978,7 +1992,7 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
    
      
       //continue;
-	
+      /*	
       if(fastq)
 	{
       
@@ -2007,7 +2021,7 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
 	  
 	  
 	}
-
+      */
       //continue;
 	
        //ensuring the line is large enough to fit a kmer in it
@@ -2051,7 +2065,11 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
 		  currentNodePtr->chunk.push_back(line);
 		  currentNodePtr->qualityScores.push_back(qualityScore);
 		  //cerr<<"right after push back operation "<<"tid is "<<tid<<endl;
+
+		  //cerr<<"line is "<<line.length()<<endl;
+		  //cerr<<"quality is "<<qualityScore.length()<<endl;
 	      
+		  //exit(0);
 
 		}
 	    }
@@ -2143,12 +2161,13 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
 
 
 //function to read in Clusters do some filtering and pass the filtered Clusters to be assembled
-void readInClusters(vector<string> &fileNames)
+void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int clusterKmerSize)
 {
   
   ifstream clusterFile;
   string line, read, clusterIdentifier;
   uint_fast64_t clusterID, i;
+  // ReadCluster cluster;
 
 
   dense_hash_map<uint_fast64_t, vector<string> *, customHash> clusters; //hash table key is cluster ID value is a pointer to the  set of reads that belong to that cluster
@@ -2222,32 +2241,38 @@ void readInClusters(vector<string> &fileNames)
 
 
 	  //number of reads in cluster cutoff
-	  //#########Must change! currently hardcoded
-	  if(iter->second->size()>4)
+	  if(iter->second->size()> cutoffClusterSize)
 	    {
+	      ReadCluster cluster;
 
-	      /*
-	      FragmentStore<> store;
-
-	      //adding reads to the fragment store
-	      auto vectorIter=iter->second->begin();
-	      for(vectorIter; vectorIter!=iter->second->end(); vectorIter++)
+	      //adding the sequences to the cluster
+	      cluster.addSequences(*(iter->second));
+	      cluster.setKmerSize(clusterKmerSize);
+	      cluster.getKmers();
+	      
+	      std::pair<uint_fast64_t, long> pair=cluster.getPair(0);
+	      
+	      if(pair.second==cluster.getNumReads())
 		{
-		  appendRead(store, *vectorIter);
+		  //cerr<<pair.second<<"\t"<<pair.first<<"\t number of Reads is "<<cluster.getNumReads()<<endl;
+		  
+		  cluster.printReads();
+		  cluster.setStartPositions(pair.first);
+		  cluster.printStartPositions();
+		  cluster.mergeReads(clusterKmerSize, 3);
+		  //cout<<bit2String(pair.first, clusterKmerSize)<<endl;
+		  //exit(0);
+		  //cout<<"################\n\n\n\n";
 		}
-	  
-	       ConsensusAlignmentOptions options;
-	       options.useContigID = false;
-	       options.usePositions=false;
-	       //options.runRealignment=false;
-	       consensusAlignment(store, options);
-	      */
-	       
-	      //cout<<"Cluster ID is "<<iter->first<<" Number of reads are "<<iter->second->size()<<endl;
 
-	      //AlignedReadLayout layout;
-	      //layoutAlignment(layout, store);
-	      //printAlignment(std::cout, layout, store, /*contigID=*/ 0, /*beginPos=*/ 0, /*endPos=*/ 200, 0, 120);
+
+	      //cluster.printKmerPositions();
+
+	      //cluster.printReads();
+
+	      //cout<<"Cluster now is #######################"<<"\n\n\n\n\n\n";
+
+	      //cout<<"Cluster ID is "<<iter->first<<" Number of reads are "<<iter->second->size()<<endl;
 
 	    }
 

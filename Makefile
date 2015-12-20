@@ -11,16 +11,16 @@ variantFinder : $(OBJS)
 variantFinder.o: variantFinder.cpp ReadCluster.h kmerAnalysis.h utilities.h 
 	$(CC) $(CFLAGS) -c variantFinder.cpp
 
-ReadCluster.o: ReadCluster.cpp ReadCluster.h spooky.h
+ReadCluster.o: ReadCluster.cpp ReadCluster.h spooky.h utilities.h
 	$(CC) $(CFLAGS) -c ReadCluster.cpp
 
 spooky.o: spooky.h spooky.cpp
 	$(CC) $(CFLAGS) -c spooky.cpp
 
-kmerAnalysis.o: kmerAnalysis.cpp kmerAnalysis.h ReadCluster.h spooky.h
+kmerAnalysis.o: kmerAnalysis.cpp kmerAnalysis.h ReadCluster.h spooky.h utilities.h
 	$(CC) $(CFLAGS) -c kmerAnalysis.cpp
 
-utilities.o: utilities.cpp utilities.h
+utilities.o: utilities.cpp utilities.h spooky.h
 	$(CC) $(CFLAGS) -c utilities.cpp
 
 

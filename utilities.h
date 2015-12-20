@@ -4,6 +4,23 @@
 #include<string>
 #include<algorithm>
 
+#include "spooky.h"
+
+
+
+struct customHash{
+
+  
+  size_t operator()(const unsigned long value ) const{
+
+
+    return size_t(SpookyHash::Hash64(&value, 8, 20));
+	       //return size_t(value);
+  }
+
+};
+
+
 
 void myReplace(std::string& str, const std::string& oldStr, const std::string& newStr);
 
