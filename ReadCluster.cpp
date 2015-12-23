@@ -11,13 +11,22 @@ using std::ios;
 using std::cerr;
 using std::pair;
 
-ReadCluster::ReadCluster(){
+
+/*
+ReadCluster::ReadCluster(long numReads){
+
+  cerr<<"reached this point number of Reads is "<<numReads<<endl;
 
   contig="0";
+  //startPositions.assign(-1, numReads); //set intital start positions to -1
+  
+  startPositions(-1, 5); //set intital start positions to -1
+  
+
   //readSeq.push_back("test2");
 
 }
-
+*/
 int ReadCluster::getNumReads()
 {
 
@@ -88,7 +97,8 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc)
   bool flag=false;
   double Nctr, nucCtr, badColCtr;
  
-
+  
+  
 
   //finding the maximum read size
   readSize=0;
@@ -101,8 +111,10 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc)
       
     }
 
-  numCol=(readSize*2);
+  numCol=(readSize*3);
   
+  vector<int> startMatrix(numReads, -1); //starting index in matrix of every assembled read
+
 
 			   
   //matrix to hold reads
@@ -112,78 +124,30 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc)
 
 
   
-
-
-  /*
-  //creating a matrix  sequences are lined up according to matching kmers if a particular sequence has an element in the matrix it will be filled in
-  //otherwise it will be left as an N
-  for(i=0; i<numReads; i++)
-    {
-      for(j=0; j<readSeq[i].length(); j++)
-	{
-	  matrix[i][((numCol/2)-startPositions[i])+j]=readSeq[i][j];
-	}
-    }
-  */
-
-  /*
-//creating a matrix  sequences are lined up according to matching kmers if a particular sequence has an element in the matrix it will be filled in
-  //otherwise it will be left as an N
-  for(i=0; i<numReads; i++)
-    {
-      if(i>0)
-	{
-	  cout<<"printing start positions for reads "<<i<<endl;
-	  cout<<"number of reads is "<<numReads<<endl;
-	  for(int z=0; z<startPositions.size(); z++)
-	    {
-	      cout<<startPositions[z]<<endl;
-	    }
-	}
-    
-
-      cout<<"finished printing start positions "<<endl;
-    }
-
-  cout<<"test"<<endl;
-  */
-
-  //file to put debuggin info on contig assembly
+ 
+ 
+  //file to put debugging info on contig assembly
   ofstream myfile;
   myfile.open ("debuggingMatrix.dat", ios::app);
 
-
-  
-  /*
+  //assembling reads that all share the most common kmer should take care of the majority of reads
   for(i=0; i<numReads; i++)
     {
+     
+      if(startPositions[i]==-1) //only assemble those reads that share a kmer
+      {
+        continue;
+      }
 
-      //cout<<"on Read "<<i<<endl;
-
-      for(j=0; j<readSeqs[i].length(); j++)
-	{
-	  if(i>0)
-	    {
-	      
-	      matrix[i][startPositions[i-1]+readSize+j]=readSeqs[i][j];	      //Need to comment out to complile need to change
-	    }else
-	    {
-	       matrix[i][readSize+j]=readSeqs[i][j];
-	      
-	    }
-	}
-    }
-  */
-
-  
-  for(i=0; i<numReads; i++)
-    {
 
       //cerr<<"on Read "<<i<<endl;
       
       int start=(numCol/2)-startPositions[i];
       int ctr=0;
       //cerr<<"start is "<<start<<endl;
+      startMatrix[i]=start; //storing the start position in the matrix of the assembled read
+
+
       for(j=0; j<readSeqs[i].length(); j++)
 	{
 	      
@@ -194,6 +158,82 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc)
       //cerr<<endl;
     }
     
+  
+
+  int k;
+  uint_fast64_t kmer;  
+  int ctrUnassembled=0;
+  bool foundFlag=false;
+  //Now adding in reads that were not assembled in the previous step
+  //algorithim: For a read that was not assembled look for a kmer in common with a read that was assembled 
+  //line up the unassembled read with the read that is assembled
+
+  for(i=0; i!=startPositions.size(); ++i) //got through every read looking for unassembled reads
+    {
+      foundFlag=false;
+
+      //int temp=0;
+
+      if(startPositions[i]==-1) //read was not assembled
+	{
+	  ctrUnassembled++;
+
+	  //go through every kmer in the unassembled read
+	  auto HashIter=kmerPositions[i].begin();
+	  for(HashIter; HashIter!=kmerPositions[i].end(); HashIter++)
+	    {
+	      if(foundFlag) //if have already found a matching kmer break out of loop
+		{
+		  break;
+		}
+	      
+	      kmer=HashIter->first;
+	      
+
+	      //cerr<<"for read "<<i<<" on kmer "<<kmer<<" kmer is "<<temp<<endl;
+     
+	      //temp++;
+
+	      foundFlag=false;
+
+	      for(j=0; j!=kmerPositions.size(); ++j) //go through every read looking for ones that are assembled 
+		{
+		  if(startPositions[j] > -1) //if a read has been previously assembled check to see if it has a kmer in common with the unassembled read
+		    {
+		      auto findIter=kmerPositions[j].find(kmer); //look for kmer in hash table
+		      
+		      if(findIter!=kmerPositions[j].end()) //kmer is present in an assembled read
+			{
+			  int start=(startMatrix[j]+kmerPositions[j][kmer])-kmerPositions[i][kmer]; //line up the start positions of the kmer in common between the assembled and unassembled read 
+			  int ctr=0;
+			  
+			  cerr<<"for read "<<i<<" on kmer "<<kmer<<" matching kmer position is "<<kmerPositions[j][kmer]<<" start is "<<start<<endl;
+     
+
+			  //add the unassembled read to the assembled reads
+			  for(k=0; k<readSeqs[i].length(); k++)
+			    {
+			      matrix[i][k+start]=readSeqs[i][ctr];
+			      //cerr<<readSeqs[i][ctr];
+			      ctr++;
+			    }
+			  
+			  startMatrix[i]=start;
+			  startPositions[i]=kmerPositions[i][kmer]; //adding the new assembled read to the set of reads already assembled
+			  foundFlag=true;
+			  break;
+			}
+		      
+
+		    }
+		}
+	      
+	    }	  
+	  
+	}
+
+    }
+
 
 
   
@@ -639,16 +679,23 @@ void ReadCluster::setKmerSize(int size)
 void ReadCluster::setStartPositions(uint_fast64_t kmer)
 {
   
-
-  auto iter=kmerPositions.begin();
-
+  auto iter=kmerPositions.begin(); //vectorIterator
+  long ctr=0;
     for(iter; iter!=kmerPositions.end(); iter++)
       {
 	
-	startPositions.push_back((*iter)[kmer]);
+	auto Hashiter=(*iter).find(kmer); //look for the kmer in the hash table that contains every kmer for the given read
+	if(Hashiter!=(*iter).end()) //kmer present in read
+	  {
+	    
+	    if(startPositions[ctr]==-1) //if have not already assembled this read into the cluster
+	      {
+		startPositions[ctr]=(*iter)[kmer];
+	      }
+	  }
 
+	ctr++;
       }
-
 
 }
 
@@ -703,3 +750,23 @@ void ReadCluster::printKmerPositions()
 
 
 }
+
+/*
+void ReadCluster::setUsedReadsFalse()
+{
+  if(clusterKmerSize<1)
+    {
+      cerr<<"Error number of reads in cluster is less than 1 "<<endl;
+      exit(0);
+
+    }else
+    {
+
+      usedReads.assign(clusterKmerSize, false);
+      
+    }
+
+
+
+}
+*/

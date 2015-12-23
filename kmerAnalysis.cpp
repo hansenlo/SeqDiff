@@ -2205,8 +2205,8 @@ void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int cluste
 	      clusters[clusterID]->push_back(read);
 	    }else
 	    {
-	      clusters[clusterID]=new vector<string>;
-	      clusters[clusterID]->push_back(read);
+	      clusters[clusterID]=new vector<string>; //##########NEED to Delete Memory MEMORY LEEK REMEMBER TO HANDLE###################
+	      clusters[clusterID]->push_back(read);//###############IMPORTANT LOREN SEE ABOVE##################
 	    }
 
 
@@ -2218,6 +2218,8 @@ void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int cluste
 
       auto iter=clusters.begin();
       
+      //int temp=0;
+
       //go through the set of clusters removing duplicates doing some filtering based on number of remaining reads 
       //then assemble reads using seqAn library functions
       for(iter; iter!=clusters.end(); iter++)
@@ -2243,8 +2245,11 @@ void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int cluste
 	  //number of reads in cluster cutoff
 	  if(iter->second->size()> cutoffClusterSize)
 	    {
-	      ReadCluster cluster;
+	     
 
+	      ReadCluster cluster(iter->second->size()); //input paramater is number of reads in the cluster
+
+	    
 	      //adding the sequences to the cluster
 	      cluster.addSequences(*(iter->second));
 	      cluster.setKmerSize(clusterKmerSize);
@@ -2252,18 +2257,27 @@ void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int cluste
 	      
 	      std::pair<uint_fast64_t, long> pair=cluster.getPair(0);
 	      
-	      if(pair.second==cluster.getNumReads())
-		{
+	      //cout<<cluster.getNumReads()<<"\t"<<pair.second<<endl;
+
+	      //if(pair.second==cluster.getNumReads())
+	      //{
 		  //cerr<<pair.second<<"\t"<<pair.first<<"\t number of Reads is "<<cluster.getNumReads()<<endl;
 		  
 		  cluster.printReads();
 		  cluster.setStartPositions(pair.first);
 		  cluster.printStartPositions();
+	
 		  cluster.mergeReads(clusterKmerSize, 3);
 		  //cout<<bit2String(pair.first, clusterKmerSize)<<endl;
-		  //exit(0);
+		  
+		  //temp++;
+
+		  //if(temp>5)
+		  //{
+		  //  exit(0);
+		  //}
 		  //cout<<"################\n\n\n\n";
-		}
+		  //}
 
 
 	      //cluster.printKmerPositions();

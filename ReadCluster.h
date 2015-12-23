@@ -36,11 +36,12 @@ private:
   //the start of the kmer 
   std::vector<std::pair<uint_fast64_t, long>> kmerCounts; //is a vector of pairs the first value  in the pair is the kmer the second value is the count of how many reads contain that kmer 
   int clusterKmerSize; //variable to hold the size of the kmers used to assemble the reads 
-  std::vector<int> startPositions;
-  std::vector<bool> usedRead; //vector of boolean values each element of the vector represents one of the reads in the cluster. If a read has already been used in assembling the cluster its value is set to true
+  std::vector<int> startPositions; //startPosition the kmer used to align the read with at least one other read in the cluster 
+  //std::vector<bool> usedReads; //vector of boolean values each element of the vector represents one of the reads in the cluster. If a read has already been used in assembling the cluster its value is set to true
 
 public:
-  ReadCluster();
+  ReadCluster()=default;
+ ReadCluster(long numReads):startPositions(numReads, -1){contig="0";} //parameter numReads is the number of reads that will go into this cluster
   void addSeq(std::string &); //functon to add a single read to the vector of reads
   std::vector<std::string> getSeqs();
   std::string getContig();
@@ -54,8 +55,9 @@ public:
   void printKmerPositions();
   int getKmerSize(){return clusterKmerSize;};
   std::pair<uint_fast64_t, long> getPair(long index); //given an index return the pair kmer count pair corresponding to that index
-  void setStartPositions(uint_fast64_t kmer); //given a kmer set the start position vector by getting the position in every read of that kmer
+  void setStartPositions(uint_fast64_t kmer); //given a kmer set the start position of that kmer for each read that contains the given kmer usually only called once for the kmer that occurs most often among the set of reads
   void printStartPositions();
+  //void setUsedReadsFalse(); //will set the vector of usedReads all to false using the member variable clusterKmerSize if clusterKmerSize is not defined will throw an error
 
 };
 
