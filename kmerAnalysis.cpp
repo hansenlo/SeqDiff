@@ -1084,7 +1084,7 @@ void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_
       //the vector files contains a set of ofstream pointers to different file output objects
 #pragma omp critical(PRINT_ALL_UNIQUE_READS)
       {
-	//*(files[clusterFiles[stoull(clusterBuffer[j][1])]])<<clusterBuffer[j][0]<<"\t"<<clusterBuffer[j][1]<<"\n";
+	*(files[clusterFiles[stoull(clusterBuffer[j][1])]])<<clusterBuffer[j][0]<<"\t"<<clusterBuffer[j][1]<<"\n";
       }
 		 
     }
@@ -1144,7 +1144,9 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
   uint_fast64_t index, reversedKey, firstKey, secondKey, tempKey, posKey, negKey, first, middle, end, currentUniqueKey;
   uint_fast64_t lastKey, clusterIndex, randomFileIndex, tempValue;
   int posMaxInter, posSecondBestInter, negMaxInter, negSecondBestInter;
- 
+  long distanceFirstKey; //the distance in basepairs from the current key only add the first key to the cluster if the distance is less than kmer size from the first key
+  //I am doing this to avoid chaining together reads into super contigs
+
   string validChar = "ACGTacgtN";
   string DNAchar="ACGTacgt";
 
@@ -1236,7 +1238,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
       secondKey=0;
       kmerCounter=0;
       NCtr=0;
-    
+      distanceFirstKey=0;
 
 
       //cerr<<"line is "<<line<<endl;
@@ -1318,6 +1320,11 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		  continue;  
 		}
 	      
+	      if(kmerCounter>0)
+		{
+		  distanceFirstKey++; //getting the distance from the first unique key
+		}
+
 
 	      //16 bit reverse complement 
 	      reversedKey = (bitTable[key & 0xffff] << 48) | 
@@ -1341,6 +1348,9 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 	      if(iter!=uniqueKmers.end() || revIter!=uniqueKmers.end() )
 	      {
 
+		
+
+
 
 		//if count of unique kmers is less than the cutoff
 		if(iter->second < 5 && revIter->second < 5)
@@ -1355,19 +1365,17 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		    break;
 		  }
 
-		  
-		  
                  
-		 
 		  
 		  //if clusterBuffer reaches the maximum size then output each read sequence to the correct 
 		  //output file the cluster the read belongs to is stored in
 		  if(clusterBuffer.size()>10000)
 		    {
 
-		     
+		    
 		      if(uniqueReadsBuffer.size() > 0 && clusterBuffer.size() > 0)
 			{
+			  
 			  printClusters(clusterBuffer, clusterFiles, uniqueReadsBuffer, uniqueOut, files, tid);
 		      	}
 
@@ -1512,8 +1520,11 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			  //do not have to worry about last word since last word is  the current word 
 			  if(kmerCounter>1)
 			    {
-			      if(clusterKmers.count(firstKey)==0)
-				{
+			      
+			      //      if(clusterKmers.count(firstKey)==0)
+			
+			      if(clusterKmers.count(firstKey)==0 && distanceFirstKey < (2*kmerSize))
+			      	{
                                  #pragma omp critical(ADD_KEY_EXISTING_CLUSTER)
 				  {
 				  
@@ -1569,8 +1580,10 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			  
 			  if(kmerCounter>1)
 			    {
-			      if(clusterKmers.count(reversedKey)==0)
-				{
+			      //if(clusterKmers.count(reversedKey)==0)
+			
+			      if(clusterKmers.count(reversedKey)==0 && distanceFirstKey < (2*kmerSize))
+			     	{
 				 #pragma omp critical(ADD_REV_KEY_EXISTING_CLUSTER)
 				  {
 				 
@@ -1663,6 +1676,15 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
   if(uniqueReadsBuffer.size() > 0 && clusterBuffer.size() > 0)
     {
+
+      //#pragma omp critical(DEBUGGING)
+      //{
+		  
+      //cerr<<"size of cluster Buffer in flushing function is "<<clusterBuffer.size()<<endl;
+		  
+      //}
+		
+
   //flush whatever is left in the buffers
       printClusters(clusterBuffer, clusterFiles, uniqueReadsBuffer, uniqueOut, files, tid);
     }
@@ -1774,8 +1796,10 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
   //creating and opening a set of output files to place clusters into
   for(i=0; i<numFiles; i++)
     {
-      line="/home/massa/Temp/file"+to_string(i)+".dat";
-      
+      //line="/home/massa/Temp/file"+to_string(i)+".dat";
+
+      line="/data/Temp/"+to_string(i)+".dat";
+
       //line="/data1/HEM0013-131-LYMPH.bam.aspera-env et al/Temp/"+to_string(i)+".dat";
       fileNames.push_back(line);
       //line="/data1/HEM0013-131-LYMPH.bam.aspera-env et al/SingleCore/"+to_string(i)+".dat";
@@ -1786,7 +1810,9 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
   //ofstream uniqueOut("/data7/SeqDiffResults/Results/uniqueReads.fastq");
 
   //ofstream uniqueOut("/data1/HEM0013-131-LYMPH.bam.aspera-env et al/uniqueReads.fastq");
-    ofstream uniqueOut("/data/Sequencing/kmerAnalysis/uniqueReads.fastq");
+  //ofstream uniqueOut("/data/Sequencing/kmerAnalysis/uniqueReads.fastq");
+
+  ofstream uniqueOut("/data/uniqueReads.fastq");
 
 
 
@@ -2160,7 +2186,7 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
 
 
 
-//function to read in Clusters do some filtering and pass the filtered Clusters to be assembled
+//function to read some clusters do some filtering and pass the filtered Clusters to be assembled
 void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int clusterKmerSize)
 {
   
@@ -2218,7 +2244,7 @@ void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int cluste
 
       auto iter=clusters.begin();
       
-      //int temp=0;
+      int temp=0;
 
       //go through the set of clusters removing duplicates doing some filtering based on number of remaining reads 
       //then assemble reads using seqAn library functions
@@ -2241,7 +2267,7 @@ void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int cluste
 	  auto last=unique(iter->second->begin(), iter->second->end());
 	  iter->second->erase(last, iter->second->end());
 
-
+	 
 	  //number of reads in cluster cutoff
 	  if(iter->second->size()> cutoffClusterSize)
 	    {
@@ -2253,21 +2279,33 @@ void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int cluste
 	      //adding the sequences to the cluster
 	      cluster.addSequences(*(iter->second));
 	      cluster.setKmerSize(clusterKmerSize);
-	      cluster.getKmers();
+	      uint_fast64_t maxKmer=cluster.getKmers();
 	      
-	      std::pair<uint_fast64_t, long> pair=cluster.getPair(0);
+	    
+
+	      //std::pair<uint_fast64_t, long> pair=cluster.getPair(0);
 	      
+	      //cerr<<"maxKmer is "<<maxKmer<<endl;
+	      //cerr<<"highest pair is "<<pair.first<<endl;
+
 	      //cout<<cluster.getNumReads()<<"\t"<<pair.second<<endl;
 
 	      //if(pair.second==cluster.getNumReads())
 	      //{
 		  //cerr<<pair.second<<"\t"<<pair.first<<"\t number of Reads is "<<cluster.getNumReads()<<endl;
 		  
-		  cluster.printReads();
-		  cluster.setStartPositions(pair.first);
-		  cluster.printStartPositions();
-	
+		  //cluster.printReads();
+		  cluster.setStartPositions(maxKmer);
+		  //cluster.printStartPositions();
+
+		  //cerr<<"on cluster "<<temp<<" before merge reads"<<endl;
+
 		  cluster.mergeReads(clusterKmerSize, 3);
+
+		  //cerr<<"on cluster "<<temp<<" after merge reads"<<endl;
+
+		  temp++;
+		  
 		  //cout<<bit2String(pair.first, clusterKmerSize)<<endl;
 		  
 		  //temp++;

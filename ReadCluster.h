@@ -38,6 +38,8 @@ private:
   int clusterKmerSize; //variable to hold the size of the kmers used to assemble the reads 
   std::vector<int> startPositions; //startPosition the kmer used to align the read with at least one other read in the cluster 
   //std::vector<bool> usedReads; //vector of boolean values each element of the vector represents one of the reads in the cluster. If a read has already been used in assembling the cluster its value is set to true
+  
+
 
 public:
   ReadCluster()=default;
@@ -49,7 +51,7 @@ public:
   std::vector< google::dense_hash_map<uint_fast64_t, long, customHash> >& getPositions(){ return kmerPositions;}; 
   std::string mergeReads(int kmerSize, int cutoffMinNuc);
   void addSequences(std::vector<std::string> &); //function to add a vector of reads
-  void getKmers(); //function that will calculate the set of kmers for each read and store them in the class variables kmerPositions and kmerCounts 
+  uint_fast64_t getKmers(); //function that will calculate the set of kmers for each read and store them in the class variable kmerPositions functions returns the kmer that occurs most often in the reads that belong to the cluster 
   void setKmerSize(int size); 
   int getNumReads();
   void printKmerPositions();
