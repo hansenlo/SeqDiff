@@ -10,7 +10,7 @@ using std::ifstream;
 using google::dense_hash_map;
 using google::sparse_hash_map;
 using std::vector;
-
+using std::ofstream;
 //example
 
 //variantFinder <exp kmer count file> <exp sequencing lib fastq or fasta> <kmerSize>
@@ -32,6 +32,7 @@ int main(int argc, char *argv[] )
   string line;
   char start;
   bool fastq;
+  vector<string> fileNames; //names of the files clusters are stored in
 
   //number of characters in kmer
   kmerSize=atoi(argv[3]);
@@ -58,6 +59,7 @@ int main(int argc, char *argv[] )
   dense_hash_map<uint_fast64_t, uint_fast64_t, customHash> masterKey; //hash table contains the first middle and end kmer of the master read that defines a cluster
   masterKey.set_empty_key(-1);
 
+  /*
   vector<string> test;
 
   test.push_back("/data/Temp/0.dat");
@@ -65,13 +67,13 @@ int main(int argc, char *argv[] )
   //test is the file containing the reads in a contig
   //4 is the cutoff number of reads 
   //20 is the kmer size used to assemble the reads into a contig
-    readInClusters(test, 4, 20);
+    readInCluster(test[0], 4, 20);
 
 
   //assembleContigs();
 
   return(0);
-
+  */
 
    //sparse_hash_map<uint_fast64_t, int, customHash> uniqueKmers;
 
@@ -133,18 +135,82 @@ int main(int argc, char *argv[] )
     cerr<<"finished getting control kmers"<<endl;
 
       //256 is number of files to split clusters into
-    getReads(uniqueKmers, 256, continueFlag, expSeqLib, kmerSize);
+    fileNames=getReads(uniqueKmers, 256, continueFlag, expSeqLib, kmerSize);
 
+
+    int currentClusterFilePublic=0; //index of the current cluster file that has not yet been assembled ctr will be shared by all threads
+    int currentClusterFilePrivate=0; //index of the cluster file the thread is currently working on will be private
 
     //test.push_back("/data/Temp/0.dat");
 
     cerr<<"Starting to assemble clusters "<<endl;
 
-  //test is the file containing the reads in a contig
-  //4 is the cutoff number of reads 
-  //20 is the kmer size used to assemble the reads into a contig
-    //readInClusters(test, 4, 20);
+    int thread_count=20;
+    int tid;
 
+
+    
+    ofstream contigOut("/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/contigs.fa"); //location of where to put file containing contigs
+    long clusterID=0;
+
+    ofstream debuggingMatrix("/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/debuggingMatrix.dat"); //location of where to put file containing the matrix of aligned reads used to assemble contigs
+
+    
+    //parallizing the cluster assembly 
+#pragma omp parallel num_threads(thread_count) default(shared)	\
+  private(tid, currentClusterFilePrivate)
+  {
+
+    tid=omp_get_thread_num();
+
+    while(currentClusterFilePublic<fileNames.size())
+      {
+
+    //get the current cluster file that needs to be assembled 
+#pragma omp critical(GET_CLUSTER)
+	{
+	  currentClusterFilePrivate=currentClusterFilePublic;
+	  currentClusterFilePublic++;
+	
+	}
+
+	//#pragma omp critical(TEST)
+	//{
+	  //cerr<<"currentClusterFilePrivate index is "<<currentClusterFilePrivate<<endl;
+
+
+	//4 is the cutoff number of reads 
+	//20 is the kmer size used to assemble the reads into a contig
+	
+	readInCluster(fileNames[currentClusterFilePrivate], 4, 20, tid, contigOut, clusterID, debuggingMatrix);
+
+	  // readInCluster(fileNames[1], 4, 20, tid);
+	 
+	   //currentClusterFilePrivate++;
+  
+	   //cerr<<"after readINCluster function call "<<endl;
+
+	  //}
+    
+      }
+
+
+
+  }
+    
+
+    /*
+    int i;
+
+    for(i=0; i<fileNames.size(); i++)
+      {
+
+	readInCluster(fileNames[i], 4, 20, tid);
+      }
+    */
+  	  
+  contigOut.close();
+  debuggingMatrix.close();
 
     return(0);
    

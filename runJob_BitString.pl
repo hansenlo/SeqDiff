@@ -8,9 +8,10 @@ do "/home/hansenlo/Code/usefulFunctions.pl";
 die $@ if $@;
 
 
-my $file=shift;
-my $cutoff=shift;
-my $controlFile=shift;
+my $expFastq=shift; #the file containing the fastq reads for the experiment
+my $expKmerCounts=shift; #the file containing the counts of how often each kmer occurs
+my $controlFile=shift; #the file containing the control reads if present
+
 
 #given a contig file and a cutoff indicating how much to start aligning from each end
 #iteratively increase the size of the end alignments until you get a unique alignment or you reach
@@ -28,7 +29,7 @@ sub extendAlignments($ $ $ $);
 my($cmd, $line, $i, $header, $outputUnique, $outputOverlapEdena, $contigEdgesOutput, $alignmentOutput, $tempIn, $tempOut);
 my($allReads, @splitLine, $path, $outputKmerLib, $dataset, $blastDB);
 
-@splitLine=split(/\//,$controlFile);
+@splitLine=split(/\//, $expFastq);
 
 print "$splitLine[$#splitLine]\n";
 
@@ -42,11 +43,10 @@ $dataset=$1;
 #exit();
 
 
-$file=~m/(.*)\/(.*).fastq$/;
+$expFastq=~m/(.*)\/(.*).fastq$/;
 
 $path=$1."/";
 
-$outputKmerLib=$path."Control_kmers_for_".$dataset.".dat";
 
 
 #$blastDB="/data6/Bowtie2Index/elegansCe10";
@@ -61,7 +61,9 @@ $blastDB="/data/Bowtie2Index/hg19GATK";
 if(1==1)
 {
 #compiling the code
-$cmd="g++ findDiff_BitString_HashTableVer.cpp spooky.cpp -g -O3 -o findDiff_BitString_HashTableVer -std=c++11 -Wno-deprecated -fopenmp";
+#$cmd="g++ findDiff_BitString_HashTableVer.cpp spooky.cpp -g -O3 -o findDiff_BitString_HashTableVer -std=c++11 -Wno-deprecated -fopenmp";
+
+    $cmd="make";
 
 #$cmd="g++ findDiff_BitString_HashTableVer_FilterOnControl.cpp spooky.cpp -g -O3 -o temp -std=c++0x -Wno-deprecated";
 
@@ -78,30 +80,32 @@ $outputUnique=$header.".fastq";
 
 
 
-if(1==1)
+if(1==2)
 {
 
 #getting those reads that passed the filter running the code
 #$tempIn="/data/HEM0013-4/".$file;
 
-$tempIn=$file;
+#$tempIn=$file;
 
 #$outputKmerCount="/data4/HEM0013_158/uniqueKmerCount_unique_HEM0013-158-MC_allReads.dat";
 
 #$cmd="time ./findDiff_HashTable_filterReads $tempIn 20 0 $outputKmerCount > "."/home/hansenlo/SeqDiff/Results/".$outputUnique;
 
-$cmd="time ./findDiff_BitString_HashTableVer $controlFile $file  31 0 $cutoff temp.dat > "."/home/hansenlo/SeqDiff/Results/".$outputUnique;
+#$cmd="time ./findDiff_BitString_HashTableVer $controlFile $file  31 0 $cutoff temp.dat > "."/home/hansenlo/SeqDiff/Results/".$outputUnique;
+
+$cmd="time ./variantFinder $expKmerCounts $expFastq 31";
 
 #$cmd="time ./temp $controlFile $file  31 0 $cutoff temp.dat > "."/data7/SeqDiffResults/Results/".$outputUnique;;
 
 
-#$cmd="time ./findDiff_BitString $controlFile $file 20  0 $cutoff temp.dat > "."/data7/SeqDiffResults/Results/".$outputUnique;;
+#$cmd="time ./findDiff_BitString $controlFile $file 20  0 $cutoff temp.dat > "."/data5/SeqDiffResults/Results/".$outputUnique;;
 
 
 #$cmd="time ./findDiff_BitString $controlFile $file  18 0 $cutoff temp.dat > "."/data4/".$outputUnique;
 
 #deleting old debugging file if present
-system("rm debuggingMatrix.dat");
+#system("rm debuggingMatrix.dat");
     #or die "system rm debuggingMatrix.dat failed\n";
 
 
@@ -111,7 +115,7 @@ system($cmd)==0
     or die "system $cmd failed\n";
 
 #move contigs to appropriate directory
-$cmd="cp /home/hansenlo/SeqDiff/Temp/contigs.fa /data7/SeqDiffResults/Results/".$header."_contigs.fasta";
+$cmd="cp /home/hansenlo/SeqDiff/gitHubProject/SeqDiff/contigs.fa /data5/SeqDiffResults/Results/".$header."_contigs.fasta";
 print "####cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
@@ -122,12 +126,12 @@ system($cmd)==0
 
 
 #finding the overlap between unique reads
-$outputOverlapEdena="/data7/SeqDiffResults/Results/".$header.".ovl";
+$outputOverlapEdena="/data5/SeqDiffResults/Results/".$header.".ovl";
 
 if(1==2)
 {
 
-$cmd="/home/hansenlo/bin/edena -nThreads 14 -minOverlap 25 -singleEnd /data7/SeqDiffResults/Results/".$outputUnique." -p $header";
+$cmd="/home/hansenlo/bin/edena -nThreads 14 -minOverlap 25 -singleEnd /data5/SeqDiffResults/Results/".$outputUnique." -p $header";
 
 print "#####cmd is $cmd\n";
 system($cmd)==0
@@ -135,7 +139,7 @@ system($cmd)==0
 
 
 #moving output file to correct dirctory
-$cmd="mv ".$header.".ovl"." /data7/SeqDiffResults/Results/";
+$cmd="mv ".$header.".ovl"." /data5/SeqDiffResults/Results/";
 system($cmd)==0
     or die "system $cmd failed\n";
 }
@@ -145,7 +149,7 @@ if(1==2)
 {
    
 
-    $cmd="velveth /home/hansenlo/SeqDiff/Temp/ 31 -fastq -short /data7/SeqDiffResults/Results/".$outputUnique;
+    $cmd="velveth /home/hansenlo/SeqDiff/Temp/ 31 -fastq -short /data5/SeqDiffResults/Results/".$outputUnique;
     
 #running Andys reads through the assembler
  #$cmd="velveth /home/hansenlo/SeqDiff/Temp/ 31 -fasta -short /home/hansenlo/AndysStuff/mergedAndysFiles.fasta";
@@ -159,7 +163,7 @@ if(1==2)
     #{
 	#$cutoff=$i;
 
-	$cmd="velvetg /home/hansenlo/SeqDiff/Temp/ -read_trkg yes -cov_cutoff $cutoff -min_contig_lgth 101";
+#	$cmd="velvetg /home/hansenlo/SeqDiff/Temp/ -read_trkg yes -cov_cutoff $cutoff -min_contig_lgth 101";
  
 
 	print "####cmd is $cmd\n\n";
@@ -182,7 +186,7 @@ if(1==2)
 
 
 
-    $cmd="cp /home/hansenlo/SeqDiff/Temp/contigs.fa /data7/SeqDiffResults/Results/".$header."_contigs.fasta";
+    $cmd="cp /home/hansenlo/SeqDiff/Temp/contigs.fa /data5/SeqDiffResults/Results/".$header."_contigs.fasta";
     print "####cmd is $cmd\n\n";
     system($cmd)==0
 	or die "system $cmd failed\n";
@@ -208,20 +212,20 @@ $cmd="/home/hansenlo/bin/edena -c 90 -minCoverage 2 -e ".$outputOverlapEdena." -
 
 
 
-$cmd="tr ‘[:lower:]‘ ‘[:upper:]‘ <  /data7/SeqDiffResults/Results/".$outputUnique." > /data7/SeqDiffResults/Results/temp.fastq";
+$cmd="tr ‘[:lower:]‘ ‘[:upper:]‘ <  /data5/SeqDiffResults/Results/".$outputUnique." > /data5/SeqDiffResults/Results/temp.fastq";
 
 
 print "####cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
 
-$cmd="fastq_to_fasta -n -i  /data7/SeqDiffResults/Results/temp.fastq > /data7/SeqDiffResults/Results/foo.dat";
+$cmd="fastq_to_fasta -n -i  /data5/SeqDiffResults/Results/temp.fastq > /data5/SeqDiffResults/Results/foo.dat";
 
 print "####cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
 
-$cmd="time /home/hansenlo/bin/CAP3/cap3 /data7/SeqDiffResults/Results/foo.dat -p 99  > temp.dat";
+$cmd="time /home/hansenlo/bin/CAP3/cap3 /data5/SeqDiffResults/Results/foo.dat -p 99  > temp.dat";
 print "####cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
@@ -229,11 +233,11 @@ system($cmd)==0
 
 if(1==2)
 {
-$cmd="mv *contig* /data7/SeqDiffResults/Results/";
+$cmd="mv *contig* /data5/SeqDiffResults/Results/";
 system($cmd)==0
     or die "system $cmd failed\n";
 
-$cmd="mv *log* /data7/SeqDiffResults/Results/";
+$cmd="mv *log* /data5/SeqDiffResults/Results/";
 system($cmd)==0
     or die "system $cmd failed\n";
 }
@@ -241,49 +245,49 @@ system($cmd)==0
 
 
 
-$contigEdgesOutput="/data7/SeqDiffResults/Results/".$header."_contigEdges.fasta";
+$contigEdgesOutput="/data5/SeqDiffResults/Results/".$header."_contigEdges.fasta";
 
-#$contigEdgesOutput="/data7/SeqDiffResults/Results/".$header."RefGenomeOnly_contigEdges.fasta";
+#$contigEdgesOutput="/data5/SeqDiffResults/Results/".$header."RefGenomeOnly_contigEdges.fasta";
 if(1==1)
 {
 #####getting the edges of contigs
-#$contigEdgesOutput="/data7/SeqDiffResults/Results/".$header."_contigEdges.fasta";
+#$contigEdgesOutput="/data5/SeqDiffResults/Results/".$header."_contigEdges.fasta";
 
-#$cmd="time perl VariantPerlScripts.pl "."/data7/SeqDiffResults/Results/".$header."_contigs.fasta"." 30 > $contigEdgesOutput";
+#$cmd="time perl VariantPerlScripts.pl "."/data5/SeqDiffResults/Results/".$header."_contigs.fasta"." 30 > $contigEdgesOutput";
 
 #CAP3 command
-#$cmd="time perl VariantPerlScripts.pl "."/data7/SeqDiffResults/Results/foo.dat.cap.contigs"." 30 > $contigEdgesOutput";
+#$cmd="time perl VariantPerlScripts.pl "."/data5/SeqDiffResults/Results/foo.dat.cap.contigs"." 30 > $contigEdgesOutput";
 
 #velvet command temp.dat is a dummy file extract flag means use the extract fasta function
-$cmd="time perl VariantPerlScripts.pl "."/home/hansenlo/SeqDiff/Temp/contigs.fa"." 40 temp.dat extract  > $contigEdgesOutput";
+$cmd="time perl VariantPerlScripts.pl "."/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/contigs.fa"." 40 temp.dat extract  > $contigEdgesOutput";
 
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
 
 #copy contigs to Results folder
-$cmd="cp /home/hansenlo/SeqDiff/Temp/contigs.fa "."/data7/SeqDiffResults/Results/".$header."_contigs.fasta";
-print "#######cmd is $cmd\n\n";
-system($cmd)==0
-    or die "system $cmd failed\n";
+#$cmd="cp /home/hansenlo/SeqDiff/Temp/contigs.fa "."/data5/SeqDiffResults/Results/".$header."_contigs.fasta";
+#print "#######cmd is $cmd\n\n";
+#system($cmd)==0
+#    or die "system $cmd failed\n";
 
 }
 
 
-if(1==1)
+if(1==2)
 {
 
 
 #aligning all unique reads to artifical chromosome
-#$alignmentOutput="/data7/SeqDiffResults/Results/Alignment/".$header.".sam";
+#$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header.".sam";
 
 
 
 ##############################aligning all unique reads##################
 #aligning all unique reads 
-$alignmentOutput="/data7/SeqDiffResults/Results/Alignment/".$header.".sam";
+$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header.".sam";
 
-#$alignmentOutput="/data7/SeqDiffResults/Results/Alignment/".$header."_refGenomeOnly.sam";
+#$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."_refGenomeOnly.sam";
 
 #$blastDB="/home/hansenlo/Genomes/Bowtie2Index/hg19";
 
@@ -293,21 +297,25 @@ $alignmentOutput="/data7/SeqDiffResults/Results/Alignment/".$header.".sam";
 
 #$blastDB="/home/gabdank/genomes_fasta/elegans_W235_index";
 
-$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data7/SeqDiffResults/Results/"."$outputUnique --un /data7/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+
+$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data/uniqueReads.fastq --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+
+
 
 
 #fasta command DONT FORGET
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB -f "."/data7/SeqDiffResults/Results/"."$outputUnique --un /data7/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB -f "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
 
 
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/seqA "."/data7/SeqDiffResults/Results/"."$outputUnique --un /data7/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/seqA "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
 
 
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
 
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$header.".bam";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".bam";
 
 #converting alignments to bam format
 $cmd="samtools view -bS $alignmentOutput > ".$tempOut;
@@ -320,7 +328,7 @@ system($cmd)==0
 
 #sorting the aligments
 $tempIn=$tempOut;
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$header.".sorted";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".sorted";
 
 #sorting bam files
 $cmd="samtools sort -m 40000000000 $tempIn $tempOut";
@@ -337,7 +345,7 @@ system($cmd)==0
     or die "system $cmd failed\n";
 
 #creating a unique alignment
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$header.".sorted.unique.bam";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".sorted.unique.bam";
 $cmd="samtools view -bq 15 $tempIn > $tempOut";
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
@@ -353,7 +361,7 @@ system($cmd)==0
 
 #convert to bed file
 $tempIn=$tempOut;
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$header.".sorted.unique.bed";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".sorted.unique.bed";
 $cmd="bamToBed -i $tempIn > $tempOut";
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
@@ -365,11 +373,12 @@ system($cmd)==0
 if(1==1)
 {
 ######################Aligning the contigs#####################3
-#$alignmentOutput="/data7/SeqDiffResults/Results/Alignment/".$header."refGenomeOnly_contigEdges.sam";
+#$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."refGenomeOnly_contigEdges.sam";
 
-$alignmentOutput="/data7/SeqDiffResults/Results/Alignment/".$header."_contigs.sam";
+$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."_contigs.sam";
 
-my $contigs="/data7/SeqDiffResults/Results/".$header."_contigs.fasta";
+my $contigs="/data5/SeqDiffResults/Results/".$header."_contigs.fasta";
+
 
 #$blastDB="/home/hansenlo/Genomes/Bowtie2Index/hg19";
 
@@ -377,9 +386,9 @@ my $contigs="/data7/SeqDiffResults/Results/".$header."_contigs.fasta";
 
 #$blastDB="/home/gabdank/genomes_fasta/elegans_W235_index";
 
-$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB -f $contigs --un /data7/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Contigs.fasta "."-S $alignmentOutput";
+$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB -f $contigs --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Contigs.fasta "."-S $alignmentOutput";
 
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/seqA -f $contigEdgesOutput --un /data7/SeqDiffResults/Results/Alignment/".$header."_unAlignable_ContigEdges.fasta "."-S $alignmentOutput";
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/seqA -f $contigEdgesOutput --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_ContigEdges.fasta "."-S $alignmentOutput";
 
 
 print "#######cmd is $cmd\n\n";
@@ -388,7 +397,7 @@ system($cmd)==0
 
 #getting bam files for contig edges alignment
 my $contigheader=$header."_contigs";
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$contigheader.".bam";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$contigheader.".bam";
 
 #converting alignments to bam format
 $cmd="samtools view -bS $alignmentOutput > ".$tempOut;
@@ -399,7 +408,7 @@ system($cmd)==0
 
 #sorting the aligments
 $tempIn=$tempOut;
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$contigheader.".sorted";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$contigheader.".sorted";
 
 #sorting bam files
 $cmd="samtools sort $tempIn $tempOut";
@@ -416,7 +425,7 @@ system($cmd)==0
     or die "system $cmd failed\n";
 
 #convert to bed file all alignments
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$contigheader.".sorted.bed";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$contigheader.".sorted.bed";
 $cmd="bamToBed -i $tempIn > $tempOut";
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
@@ -425,7 +434,7 @@ system($cmd)==0
 
 
 #creating a unique alignment
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$contigheader.".sorted.unique.bam";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$contigheader.".sorted.unique.bam";
 $cmd="samtools view -bq 15 $tempIn > $tempOut";
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
@@ -433,7 +442,7 @@ system($cmd)==0
 
 #convert to bed file
 $tempIn=$tempOut;
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$contigheader.".sorted.unique.bed";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$contigheader.".sorted.unique.bed";
 $cmd="bamToBed -i $tempIn > $tempOut";
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
@@ -448,11 +457,11 @@ if(1==1)
 {
 
 
-    #&iterativeAlignment("/data7/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Contigs.fasta", 20, 80,  $blastDB, $header);
+    #&iterativeAlignment("/data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Contigs.fasta", 20, 80,  $blastDB, $header);
 
-    #&extendAlignments("mappedReads_IDs.dat", 2, "/data6/Genomes/cElegans10/allChr.fa", "/data7/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Contigs.fasta");
+    #&extendAlignments("mappedReads_IDs.dat", 2, "/data6/Genomes/cElegans10/allChr.fa", "/data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Contigs.fasta");
 
-    #&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data7/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Contigs.fasta");
+    #&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Contigs.fasta");
 
 
     #my $edges=shift;
@@ -470,9 +479,9 @@ if(1==1)
 
 
 #aligning the contig edges
-#$alignmentOutput="/data7/SeqDiffResults/Results/Alignment/".$header."refGenomeOnly_contigEdges.sam";
+#$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."refGenomeOnly_contigEdges.sam";
 
-$alignmentOutput="/data7/SeqDiffResults/Results/Alignment/".$header."_contigEdges.sam";
+$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."_contigEdges.sam";
 
 #$blastDB="/home/hansenlo/Genomes/Bowtie2Index/hg19";
 
@@ -480,7 +489,7 @@ $alignmentOutput="/data7/SeqDiffResults/Results/Alignment/".$header."_contigEdge
 
 #$blastDB="/home/gabdank/genomes_fasta/elegans_W235_index";
 
-$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 --local -x $blastDB -f $contigEdgesOutput --un /data7/SeqDiffResults/Results/Alignment/".$header."_unAlignable_ContigEdges.fasta "."-S $alignmentOutput";
+$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 --local -x $blastDB -f $contigEdgesOutput --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_ContigEdges.fasta "."-S $alignmentOutput";
 
 #$cmd="/data/bin/STAR_2.3.0e.Linux_x86_64/STAR --genomeDir /data/StarGenomes/hg19 --outSAMunmapped Within --readFilesIn $contigEdgesOutput --runThreadN 20 --outFileNamePrefix Test/test --outFilterMismatchNmax 6"; 
 
@@ -491,7 +500,7 @@ $cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 --local -x $blas
 
 
 
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/seqA -f $contigEdgesOutput --un /data7/SeqDiffResults/Results/Alignment/".$header."_unAlignable_ContigEdges.fasta "."-S $alignmentOutput";
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/seqA -f $contigEdgesOutput --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_ContigEdges.fasta "."-S $alignmentOutput";
 
 
 print "#######cmd is $cmd\n\n";
@@ -500,7 +509,7 @@ system($cmd)==0
 
 #getting bam files for contig edges alignment
 my $edgeheader=$header."_ContigEdges";
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$edgeheader.".bam";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$edgeheader.".bam";
 
 #converting alignments to bam format
 $cmd="samtools view -bS $alignmentOutput > ".$tempOut;
@@ -511,7 +520,7 @@ system($cmd)==0
 
 #sorting the aligments
 $tempIn=$tempOut;
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$edgeheader.".sorted";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$edgeheader.".sorted";
 
 #sorting bam files
 $cmd="samtools sort $tempIn $tempOut";
@@ -524,7 +533,7 @@ $tempIn=$tempOut.".bam";
 
 
 #convert to bed file all Alignments
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$edgeheader.".sorted.bed";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$edgeheader.".sorted.bed";
 $cmd=" /data/bin/Bedtools/bedtools2/bin/bamToBed -i $tempIn > $tempOut";
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
@@ -537,7 +546,7 @@ system($cmd)==0
     or die "system $cmd failed\n";
 
 #creating a unique alignment
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$edgeheader.".sorted.unique.bam";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$edgeheader.".sorted.unique.bam";
 $cmd="samtools view -bq 40 $tempIn > $tempOut";
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
@@ -545,7 +554,7 @@ system($cmd)==0
 
 #convert to bed file
 $tempIn=$tempOut;
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$edgeheader.".sorted.unique.bed";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$edgeheader.".sorted.unique.bed";
 $cmd=" /data/bin/Bedtools/bedtools2/bin/bamToBed -i $tempIn > $tempOut";
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
@@ -575,24 +584,24 @@ $header=$1;
 #$header="allmut_debug";
 
 #aligning all control reads 
-$alignmentOutput="/data7/SeqDiffResults/Results/Alignment/".$header.".sam";
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/hg19 "."/data/HEM0013-4/"."$controlFile --un /data7/SeqDiffResults/Results/Alignment/".$header."_unAlignable.fastq "."-S $alignmentOutput";
+$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header.".sam";
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/hg19 "."/data/HEM0013-4/"."$controlFile --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable.fastq "."-S $alignmentOutput";
 
 #$blastDB="/home/hansenlo/Genomes/Bowtie2Index/hg19";
 
 #$blastDB="/data/BowtieIndex/elegansCe10";
 
 
-$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."$controlFile --un /data7/SeqDiffResults/Results/Alignment/".$header."_unAlignable.fastq "."-S $alignmentOutput";
+$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."$controlFile --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable.fastq "."-S $alignmentOutput";
 
 
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/seqA "."-f /data7/SeqDiffResults/Results/"."foo.dat.cap.contigs --un /data7/SeqDiffResults/Results/Alignment/".$header."_unAlignable.fastq "."-S $alignmentOutput";
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/seqA "."-f /data5/SeqDiffResults/Results/"."foo.dat.cap.contigs --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable.fastq "."-S $alignmentOutput";
 
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
 
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$header.".bam";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".bam";
 
 #converting alignments to bam format
 $cmd="samtools view -bS $alignmentOutput > ".$tempOut;
@@ -603,7 +612,7 @@ system($cmd)==0
 
 #sorting the aligments
 $tempIn=$tempOut;
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$header.".sorted";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".sorted";
 
 #sorting bam files
 $cmd="samtools sort $tempIn $tempOut";
@@ -620,7 +629,7 @@ system($cmd)==0
     or die "system $cmd failed\n";
 
 #creating a unique alignment
-$tempOut="/data7/SeqDiffResults/Results/Alignment/".$header.".sorted.unique.bam";
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".sorted.unique.bam";
 $cmd="samtools view -bq 15 $tempIn > $tempOut";
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
@@ -663,16 +672,16 @@ sub iterativeAlignment($ $ $ $ $)
     %contigs=&readFasta($contigs);
 
 
-    #$alignmentOutput="/data7/SeqDiffResults/Results/Alignment/temp_contigEdges.sam";
+    #$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/temp_contigEdges.sam";
 
 
     $alignmentOutput="/home/hansenlo/SeqDiff/Test/testAligned.out.sam";
 
 
-    #$alignmentOutput="/data7/SeqDiffResults/Results/Alignment/".$header."_contigEdges.sam";
+    #$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."_contigEdges.sam";
 
 
-    #$locationContigs="/data7/SeqDiffResults/Results/".$header."_contigs.fasta";
+    #$locationContigs="/data5/SeqDiffResults/Results/".$header."_contigs.fasta";
 
 
     	#getting contig edges

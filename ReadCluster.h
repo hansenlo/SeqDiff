@@ -49,7 +49,7 @@ public:
   std::string getContig();
   void printReads();
   std::vector< google::dense_hash_map<uint_fast64_t, long, customHash> >& getPositions(){ return kmerPositions;}; 
-  std::string mergeReads(int kmerSize, int cutoffMinNuc);
+  std::string mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &debugging);
   void addSequences(std::vector<std::string> &); //function to add a vector of reads
   uint_fast64_t getKmers(); //function that will calculate the set of kmers for each read and store them in the class variable kmerPositions functions returns the kmer that occurs most often in the reads that belong to the cluster 
   void setKmerSize(int size); 

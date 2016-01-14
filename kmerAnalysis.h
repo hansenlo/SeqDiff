@@ -44,6 +44,6 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 std::vector<std::string> getReads(google::dense_hash_map<uint_fast64_t, int, customHash> &uniqueKmers, int numFiles, char nextLineFlag, std::string inputFile, int kmerSize);
 
 //function to read in Clusters do some filtering and pass the filtered Clusters to be assembled
-void readInClusters(std::vector<std::string> &fileNames, int cutoffClusterSize, int clusterKmerSize);
+void readInCluster(std::string &fileName, int cutoffClusterSize, int clusterKmerSize, int tid,  std::ofstream &contigOut, long &clusterNumber, std::ofstream &debuggingMatrix); //tid is for debugging purposes variable stores the thread id
 
 #endif

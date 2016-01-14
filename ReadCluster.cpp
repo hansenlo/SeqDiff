@@ -85,7 +85,7 @@ void ReadCluster::printReads()
 }
 
 //kmer size and a cutoff representing the minimum number of times the max nucleotide must occur to be counted
-string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc)
+string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &debugging)
 {
 
   long int numCol;
@@ -164,6 +164,7 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc)
   uint_fast64_t kmer;  
   int ctrUnassembled=1;
   bool foundFlag=false;
+   
   //Now adding in reads that were not assembled in the previous step
   //algorithim: For a read that was not assembled look for a kmer in common with a read that was assembled 
   //line up the unassembled read with the read that is assembled
@@ -217,6 +218,33 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc)
      
 			  
 
+			      if(start<0) //if read extends off the beginning of the matrix dynamically insert new columns at the beginning of the matrix very inefficient operation :(
+				{
+				  //cerr<<"reallocating at the beginning "<<endl;
+				  
+				  start=start+(readSize*2);
+
+				  int z;
+				  for(z=0; z<matrix.size(); z++)
+				    {
+				      matrix[z].insert(matrix[z].begin(), readSize*2, 'N'); //adding Ns at the beginning of the matrix adding 2X a read number of Ns
+				      startMatrix[z]=startMatrix[z]+(2*readSize);
+				    }
+
+
+				}
+			      
+			      if((start+readSize)>matrix[i].size()) //if read extends off the end of the matrix dynamically insert new columns at the end of the matrix 
+				{
+				  //cerr<<"reallocating at the end "<<endl;
+
+
+				  for(z=0; z<matrix.size(); z++)
+				    {
+				      matrix[z].insert(matrix[z].end(), readSize*2, 'N'); //adding Ns at the end of the matrix adding 2X a read number of Ns
+				    }
+				}				
+
 			  
 			  //add the unassembled read to the assembled reads
 			      for(k=0; k<readSeqs[i].length(); k++)
@@ -229,25 +257,28 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc)
 
 			      //cerr<<"start is "<<start<<endl;
 			      
-/*			      
+				  /*			      
 			      if(i>=matrix.size() )
 				{
 				  cerr<<"####################bad indexes##############"<<endl;
 				  return "Bad Thing";
 				}
 			      
-			      if((k+start) >=matrix[i].size())
+			      if((k+start) >=matrix[i].size() || (k+start) < 0)
 				{
 			
-				  cerr<<"start is "<<start<<" start of matrix is "<<startMatrix[j]<<" start of kmer is assembled read is "<<kmerPositions[j][kmer]<<"start of kmer in unassembled read is "<<kmerPositions[i][kmer]<<endl;
+				  cerr<<"start of unassembled read is  "<<start<<" start of assembled read is "<<startMatrix[j]<<" start of kmer in assembled read is "<<kmerPositions[j][kmer]<<" start of kmer in unassembled read is "<<kmerPositions[i][kmer]<<" k + start is "<<(k+start)<<" matrix size is "<<matrix[i].size()<<endl;
 				  exit(0);
-				  //return "Bad thing";
+				  return "Bad thing";
 				}
-*/			      
+				  */
+
+
+
 			      //matrix[i][k+start]='A';
 
-
 				  matrix[i][k+start]=readSeqs[i][ctr];
+				  
 			      //cerr<<readSeqs[i][ctr];
 			      
 				  ctr++;
@@ -279,34 +310,32 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc)
   //raw matrix before filtering
 
 
-  /*
+  
   for(i=0; i<numReads; i++)
     {
       for(j=0; j<numCol; j++)
 	{
 	  //matrix[i][((numCol/2)-startPositions[i])+j]=readSeq[i][j];
 	
-	  myfile<<matrix[i][j];
+	  debugging<<matrix[i][j];
 	}
-      myfile<<endl;
+      debugging<<endl;
     }
   
     
-  myfile<<combinedNuc<<endl;
-
-
-  myfile<<"finished printing out the matrix "<<endl;
  
-  */
+  
 
 
 string validChar = "ACGTacgt";
   
 flag=false;
 
- Nctr=0;
+ Nctr=0; //counter to keep track of number of Ns in the contig getting assembled
 
  badColCtr=0;
+
+ numCol=matrix[0].size(); //all rows are the same size
 
   for(i=0; i<numCol; i++)
     {
@@ -379,6 +408,9 @@ flag=false;
 	}
 
       
+      
+
+      
 
       indexMax=-1;
       indexMax=distance(nuc.begin(), std::max_element(nuc.begin(), nuc.end()));
@@ -407,7 +439,6 @@ flag=false;
 	  if(flag)
 	    {
 	      
-
 	      combinedNuc += 'N';
 	      Nctr++;
 	    }
@@ -435,14 +466,17 @@ flag=false;
   combinedNuc.erase( posN ); 
 
 
-  /*
+  debugging<<"contig is "<<combinedNuc<<endl;
+  debugging<<"percentage of bad columns is "<<badColCtr/combinedNuc.length()<<endl;
+  debugging<<"finished printing out the matrix "<<endl;
+  debugging<<"##############################################\n\n\n\n"<<endl;
 
-  if(combinedNuc.length() < 51)
+  if(combinedNuc.length() < (readSize/2)) //if contig to short throw it out
     {
       return "0";
     }
 
-  if((badColCtr/combinedNuc.length())>0.1)
+  if((badColCtr/combinedNuc.length())>0.1) //if to many bad columns throw it out
     {
       return "0";
     }
@@ -453,14 +487,14 @@ flag=false;
       combinedNuc="0";
     }
     
-  */
+  
 
 
   //cerr<<"reached this point in merge cluster "<<combinedNuc<<endl;
   
     contig=combinedNuc;
 
-      
+    /*
     myfile<<"####################Start of matrix###########################"<<endl;
              
     if(combinedNuc.length()>=10)
@@ -487,6 +521,7 @@ flag=false;
     myfile<<endl;
 
     myfile.close();
+    */
 
   //return "test";
   return contig;

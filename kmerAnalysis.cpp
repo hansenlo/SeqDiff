@@ -1084,7 +1084,7 @@ void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_
       //the vector files contains a set of ofstream pointers to different file output objects
 #pragma omp critical(PRINT_ALL_UNIQUE_READS)
       {
-	*(files[clusterFiles[stoull(clusterBuffer[j][1])]])<<clusterBuffer[j][0]<<"\t"<<clusterBuffer[j][1]<<"\n";
+	*(files[clusterFiles[stoull(clusterBuffer[j][1])]])<<clusterBuffer[j][0]<<"\t"<<clusterBuffer[j][1]<<endl;
       }
 		 
     }
@@ -1523,7 +1523,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			      
 			      //      if(clusterKmers.count(firstKey)==0)
 			
-			      if(clusterKmers.count(firstKey)==0 && distanceFirstKey < (2*kmerSize))
+			      if(clusterKmers.count(firstKey)==0 && distanceFirstKey < ((2*kmerSize)-1))
 			      	{
                                  #pragma omp critical(ADD_KEY_EXISTING_CLUSTER)
 				  {
@@ -1582,7 +1582,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			    {
 			      //if(clusterKmers.count(reversedKey)==0)
 			
-			      if(clusterKmers.count(reversedKey)==0 && distanceFirstKey < (2*kmerSize))
+			      if(clusterKmers.count(reversedKey)==0 && distanceFirstKey < ((2*kmerSize)-1))
 			     	{
 				 #pragma omp critical(ADD_REV_KEY_EXISTING_CLUSTER)
 				  {
@@ -1741,7 +1741,7 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
   list<node*> workList;
  
 
-  vector<string> fileNames; //vector containing files names clustes are placed into
+  vector<string> fileNames; //vector containing file names clusters are placed into
 
   //initilize random number generator
   srand (time(NULL));
@@ -1806,12 +1806,14 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
       files.push_back(make_shared<ofstream>(line, std::ios::out ));
     }
   
+  //return(fileNames);
+
 
   //ofstream uniqueOut("/data7/SeqDiffResults/Results/uniqueReads.fastq");
 
   //ofstream uniqueOut("/data1/HEM0013-131-LYMPH.bam.aspera-env et al/uniqueReads.fastq");
   //ofstream uniqueOut("/data/Sequencing/kmerAnalysis/uniqueReads.fastq");
-
+ 
   ofstream uniqueOut("/data/uniqueReads.fastq");
 
 
@@ -2186,8 +2188,8 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
 
 
 
-//function to read some clusters do some filtering and pass the filtered Clusters to be assembled
-void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int clusterKmerSize)
+//function to read in file containing many clusters do some filtering on the clusters and assemble them
+void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize, int tid,  ofstream &contigOut, long &clusterNumber, std::ofstream &debuggingMatrix)
 {
   
   ifstream clusterFile;
@@ -2195,21 +2197,32 @@ void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int cluste
   uint_fast64_t clusterID, i;
   // ReadCluster cluster;
 
+  const int maxBufferSize=10000;
+
+  vector<string> contigBuffer; //holds the set of assembled contigs will write them to a file when they get to large
+  contigBuffer.reserve(maxBufferSize);
+  
+
+  #pragma omp critical(DEBUGGING_GETCLUSTER)
+	{
+	  cerr<<"thread "<<tid<<" is working on file "<<fileName<<endl;
+	}
+
+
 
   dense_hash_map<uint_fast64_t, vector<string> *, customHash> clusters; //hash table key is cluster ID value is a pointer to the  set of reads that belong to that cluster
   clusters.set_empty_key(-1);
 
-  for(i=0; i<fileNames.size(); i++)
-    {
   
-      clusterFile.open(fileNames[0].c_str(), ifstream::in);
+      clusterFile.open(fileName.c_str(), ifstream::in);
       if(!clusterFile.is_open())
 	{
-	  cerr<<"could not open file "<<fileNames[0]<< " check to see if exists"<<endl;
+	  cerr<<"could not open file "<<fileName<< " check to see if exists"<<endl;
 	  exit(EXIT_FAILURE);
 	}
 
-      while(clusterFile.good())  
+
+      while(clusterFile.good())  //read in all the clusters
 	{
       
 	  getline(clusterFile, line);
@@ -2242,6 +2255,7 @@ void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int cluste
     
 
 
+
       auto iter=clusters.begin();
       
       int temp=0;
@@ -2261,6 +2275,8 @@ void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int cluste
 	    }
 	  */
 
+
+
 	  //deduplicating reads
 	  sort( iter->second->begin(), iter->second->end() );
 	  //iter->second->erase( unique( iter->second->begin(), iter->second->end() ), iter->second->end() );
@@ -2272,6 +2288,8 @@ void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int cluste
 	  if(iter->second->size()> cutoffClusterSize)
 	    {
 	     
+
+
 
 	      ReadCluster cluster(iter->second->size()); //input paramater is number of reads in the cluster
 
@@ -2294,74 +2312,81 @@ void readInClusters(vector<string> &fileNames, int cutoffClusterSize, int cluste
 	      //{
 		  //cerr<<pair.second<<"\t"<<pair.first<<"\t number of Reads is "<<cluster.getNumReads()<<endl;
 		  
-		  //cluster.printReads();
+	      	  //cluster.printReads();
 		  cluster.setStartPositions(maxKmer);
 		  //cluster.printStartPositions();
+		 
+		  string contig=cluster.mergeReads(clusterKmerSize, 2, debuggingMatrix);
 
-		  //cerr<<"on cluster "<<temp<<" before merge reads"<<endl;
+		  if(contig.compare("0")!=0) //if a valid contig i.e. not equal to 0 then add it to the clusterBuffer
+		    {
+		      //cout<<contig<<endl;
 
-		  cluster.mergeReads(clusterKmerSize, 3);
-
-		  //cerr<<"on cluster "<<temp<<" after merge reads"<<endl;
-
-		  temp++;
+		      contigBuffer.push_back(contig);
+		    }
 		  
 		  //cout<<bit2String(pair.first, clusterKmerSize)<<endl;
 		  
 		  //temp++;
 
-		  //if(temp>5)
-		  //{
-		  //  exit(0);
-		  //}
-		  //cout<<"################\n\n\n\n";
-		  //}
-
 
 	      //cluster.printKmerPositions();
 
-	      //cluster.printReads();
-
-	      //cout<<"Cluster now is #######################"<<"\n\n\n\n\n\n";
-
-	      //cout<<"Cluster ID is "<<iter->first<<" Number of reads are "<<iter->second->size()<<endl;
-
 	    }
 
-	  //cout<<"###############################################################\n\n";
-
-	  /*
-	  cout<<"size now is "<<iter->second->size()<<endl;
-	  vectorIter=iter->second->begin();
-	  for(vectorIter; vectorIter!=iter->second->end(); vectorIter++)
+	  
+	  if(contigBuffer.size()>=maxBufferSize) //print buffer of contigs to a file
 	    {
-	      cout<<*vectorIter<<endl;
-	    }
+
+#pragma omp critical(PRINTING_CLUSTER)
+	      {
+		long z;
+
+		for(z=0; z<contigBuffer.size(); z++)
+		  {
+		    contigOut<<">"<<clusterNumber<<"\n";
+		    contigOut<<contigBuffer[z]<<"\n";
+		    
+		    clusterNumber++;
+		  }
+		contigBuffer.clear();
+	      }
 	    
-	  cout<<"###################\n\n";
-
-	  */
-
-             //cout<<myHashIterator->first<<"\n\n";
-
-       //cerr<<"right before printing kmer "<<endl;
-       //cout<<bit2String(myHashIterator->first, kmerSize)<<"\n\n";
-       
-       //cerr<<"right before printing reads "<<endl;
-       //myHashIterator->second->printReads();
-       //continue;
+	    }
+	  
    
 
 
 	}
 
+      
+      
+#pragma omp critical(FLUSHING_CLUSTER) //flush last contigs left in buffer to a file
+	      {
+		long z;
+
+		for(z=0; z<contigBuffer.size(); z++)
+		  {
+		    contigOut<<">"<<clusterNumber<<"\n";
+		    contigOut<<contigBuffer[z]<<"\n";
+		    
+		    clusterNumber++;
+		  }
+		contigBuffer.clear();
+	      }
 
 
-    }
- 
+      
+	      
+	      //freeing up the memory that was dynamically allocated
+	      auto hashIter=clusters.begin();
 
-  
-
-  
-
+	      //deleting allocated memory
+      	      for(hashIter; hashIter!=clusters.end(); hashIter++)
+		{		  
+		  delete hashIter->second;
+		}
+	      
+      
+      
 }
