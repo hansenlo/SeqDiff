@@ -80,7 +80,7 @@ $outputUnique=$header.".fastq";
 
 
 
-if(1==2)
+if(1==1)
 {
 
 #getting those reads that passed the filter running the code
@@ -274,7 +274,7 @@ system($cmd)==0
 }
 
 
-if(1==2)
+if(1==1)
 {
 
 

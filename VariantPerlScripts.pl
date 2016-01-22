@@ -65,6 +65,7 @@ if($flag eq 'SNP')
 
 if($flag eq 'cigar')
 {
+
     &getVar_MDstring($inputFile);
 }
 
@@ -1159,6 +1160,8 @@ sub getVar_MDstring($)
 	    if($delFlag==1)
 	    {
 		$size=($delEnd-$delStart)*-1;
+		$delStart--;
+		$delEnd--;
 		print Indels "$data[2]\t$delStart\t$delEnd\t$size\n";
 		
 		$delFlag=0;

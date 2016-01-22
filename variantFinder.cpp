@@ -104,7 +104,7 @@ int main(int argc, char *argv[] )
     }
 
   //4 is the kmer count cutoff
-    readUniqueKmers(uniqueKmers, continueFlag, uniqueExpKmerCountFile, kmerSize, 5);
+      readUniqueKmers(uniqueKmers, continueFlag, uniqueExpKmerCountFile, kmerSize, 8);
 
 
   /*   
@@ -182,7 +182,7 @@ int main(int argc, char *argv[] )
 	//4 is the cutoff number of reads 
 	//20 is the kmer size used to assemble the reads into a contig
 	
-	readInCluster(fileNames[currentClusterFilePrivate], 4, 20, tid, contigOut, clusterID, debuggingMatrix);
+	readInCluster(fileNames[currentClusterFilePrivate], 6, 20, tid, contigOut, clusterID, debuggingMatrix);
 
 	  // readInCluster(fileNames[1], 4, 20, tid);
 	 
@@ -191,6 +191,7 @@ int main(int argc, char *argv[] )
 	   //cerr<<"after readINCluster function call "<<endl;
 
 	  //}
+
     
       }
 

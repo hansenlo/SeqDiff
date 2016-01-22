@@ -125,8 +125,8 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
  
  
   //file to put debugging info on contig assembly
-  ofstream myfile;
-  myfile.open ("debuggingMatrix.dat", ios::app);
+  //ofstream myfile;
+  //myfile.open ("debuggingMatrix.dat", ios::app);
 
   //assembling reads that all share the most common kmer should take care of the majority of reads
   for(i=0; i<numReads; i++)
@@ -306,24 +306,6 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
 
 
   
-  //printing the matrix
-  //raw matrix before filtering
-
-
-  
-  for(i=0; i<numReads; i++)
-    {
-      for(j=0; j<numCol; j++)
-	{
-	  //matrix[i][((numCol/2)-startPositions[i])+j]=readSeq[i][j];
-	
-	  debugging<<matrix[i][j];
-	}
-      debugging<<endl;
-    }
-  
-    
- 
   
 
 
@@ -415,7 +397,7 @@ flag=false;
       indexMax=-1;
       indexMax=distance(nuc.begin(), std::max_element(nuc.begin(), nuc.end()));
 
-      if(nuc[indexMax] > cutoffMinNuc && ((nuc[indexMax]/nucCtr) > 0.75))
+      if(nuc[indexMax] > cutoffMinNuc && ((nuc[indexMax]/nucCtr) > 0.75)) //filtering clusters
 	{
 	  flag=true;
 	  
@@ -466,10 +448,34 @@ flag=false;
   combinedNuc.erase( posN ); 
 
 
-  debugging<<"contig is "<<combinedNuc<<endl;
-  debugging<<"percentage of bad columns is "<<badColCtr/combinedNuc.length()<<endl;
-  debugging<<"finished printing out the matrix "<<endl;
-  debugging<<"##############################################\n\n\n\n"<<endl;
+
+#pragma omp critical(DEBUGGING_CLUSTER)
+  {
+    
+  //printing the matrix
+  //raw matrix before filtering
+  
+    numCol=matrix[0].size(); //all rows are the same size  
+    for(i=0; i<numReads; i++)
+      {
+	for(j=0; j<numCol; j++)
+	  {
+	  //matrix[i][((numCol/2)-startPositions[i])+j]=readSeq[i][j];
+	
+	    debugging<<matrix[i][j];
+	  }
+	debugging<<endl;
+      }
+
+    
+    debugging<<"contig is "<<combinedNuc<<endl;
+    debugging<<"percentage of bad columns is "<<badColCtr/combinedNuc.length()<<endl;
+    debugging<<"finished printing out the matrix "<<endl;
+    debugging<<"##############################################\n\n\n\n"<<endl;
+  
+
+  }
+
 
   if(combinedNuc.length() < (readSize/2)) //if contig to short throw it out
     {
@@ -533,6 +539,7 @@ flag=false;
 //same strand enforced this earlier in code
 uint_fast64_t ReadCluster::getKmers()
 {
+
   uint_fast64_t kmer, positionCtr, AbitString, CbitString, GbitString, TbitString; 
   long  i, j, k;
   
@@ -573,12 +580,16 @@ uint_fast64_t ReadCluster::getKmers()
     }
 
 
+
+
+ //return(1);
+
  
  dense_hash_map<uint_fast64_t, long, customHash> kmerInReadCounts; //hash table contains a count of how many reads contain a given kmer key is the kmer value is the count 
  kmerInReadCounts.set_empty_key(-1);
- kmerInReadCounts.resize(1000000);
+ //kmerInReadCounts.resize(1000000);
 
-
+ //return(1);
 
    //revKey=0;
   kmer=0;
@@ -594,6 +605,8 @@ uint_fast64_t ReadCluster::getKmers()
     //{
     //cerr<<"on Read "<<j<<endl;
 	//}
+
+    //continue;
 
 
     dense_hash_map<uint_fast64_t, long, customHash> readKmers; //hash table contains the kmers and their position in the read 
@@ -681,6 +694,7 @@ uint_fast64_t ReadCluster::getKmers()
 		  continue;  
 		}
 
+	      
 	      
 	      readKmers[kmer]=i;
 	      

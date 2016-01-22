@@ -1063,7 +1063,7 @@ void printSingleCluster( dense_hash_map<uint_fast64_t, long, customHash> &cluste
 
 	     	      
 //function to print out the clusters of reads and all unique reads
-void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_fast64_t, int, customHash> &clusterFiles, vector< string > &uniqueReadsBuffer, ofstream &uniqueOut, vector<std::shared_ptr<ofstream> > &files, int tid)
+void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_fast64_t, int, customHash> &clusterFiles, vector< string > &uniqueReadsBuffer, std::vector<int> &qualityBuffer, ofstream &uniqueOut, vector<std::shared_ptr<ofstream> > &files, int tid)
 {
   long j;
 
@@ -1084,7 +1084,7 @@ void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_
       //the vector files contains a set of ofstream pointers to different file output objects
 #pragma omp critical(PRINT_ALL_UNIQUE_READS)
       {
-	*(files[clusterFiles[stoull(clusterBuffer[j][1])]])<<clusterBuffer[j][0]<<"\t"<<clusterBuffer[j][1]<<endl;
+	*(files[clusterFiles[stoull(clusterBuffer[j][1])]])<<clusterBuffer[j][0]<<"\t"<<clusterBuffer[j][1]<<"\t"<<qualityBuffer[j]<<endl;
       }
 		 
     }
@@ -1138,14 +1138,15 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
   string line, header, tempLine;
   char continueFlag, start;
-  long ctr, i, revControlValue, controlValue, kmerCounter, j, NCtr;
+  long ctr, i, revControlValue, controlValue, kmerCounter, j, NCtr, k;
   long totalCtr, startFirstKmer, startSecondKmer, lineCtr;
   bool fastq, flag, secondTime, usedRead, presentCluster, foundCluster, isUnique;
   uint_fast64_t index, reversedKey, firstKey, secondKey, tempKey, posKey, negKey, first, middle, end, currentUniqueKey;
   uint_fast64_t lastKey, clusterIndex, randomFileIndex, tempValue;
-  int posMaxInter, posSecondBestInter, negMaxInter, negSecondBestInter;
+  int posMaxInter, posSecondBestInter, negMaxInter, negSecondBestInter, quality;
   long distanceFirstKey; //the distance in basepairs from the current key only add the first key to the cluster if the distance is less than kmer size from the first key
   //I am doing this to avoid chaining together reads into super contigs
+
 
   string validChar = "ACGTacgtN";
   string DNAchar="ACGTacgt";
@@ -1158,6 +1159,9 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
   vector< vector<string> > clusterBuffer;
   clusterBuffer.reserve(85000);
 
+
+  vector<int> qualityBuffer; // vector of ints to serve as flags if the unique kmer in the read contains a poor quality base will set value to 0 otherwise will set value to 1
+  qualityBuffer.reserve(85000);
 
   //creating a vector to act as a buffer to hold reads that contain a unique word
   vector< string > uniqueReadsBuffer;
@@ -1222,6 +1226,8 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 
 
+
+
       //if sequence does not continue on the next line reset all values to zero 
       //since sequence on next line is unrelated to current sequence
       if(continueFlag=='0')
@@ -1239,7 +1245,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
       kmerCounter=0;
       NCtr=0;
       distanceFirstKey=0;
-
+      bool goodQuality=true; //variable to keep track of whether or not the unique kmer contains a low quality base
 
       //cerr<<"line is "<<line<<endl;
 
@@ -1253,6 +1259,14 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 	  //secondKey=reversedKey;
 	  //startSecondKmer=i+1;
+
+	  if(workNodePtr->chunk[j].compare("TTTAGCCAATTAGCAAAGCTCATGGACACACAGAATATGTCTTTCAACAGCCACACAAATACATTTTATACTTTTTTTTCTTTTCTTTTTTTTTTATTTT")==0)
+	    {
+	      cout<<"i is "<<i<<endl;
+
+	    }
+
+
 
 	   //if character is not a nucleotide reset the bit string and start over
 	  if(DNAchar.find(workNodePtr->chunk[j][i]) == std::string::npos) {
@@ -1362,8 +1376,19 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		  //if any unique kmer is larger than the cutoff do not use that read
 		  if(iter->second > 254 || revIter->second > 254)
 		  {
+		    
+		    if(workNodePtr->chunk[j].compare("TTTAGCCAATTAGCAAAGCTCATGGACACACAGAATATGTCTTTCAACAGCCACACAAATACATTTTATACTTTTTTTTCTTTTCTTTTTTTTTTATTTT")==0)
+		      {
+			cerr<<"inside max cutoff if condition "<<endl;
+
+		      }
+
+
+
 		    break;
 		  }
+
+		 
 
                  
 		  
@@ -1374,14 +1399,15 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 		    
 		      if(uniqueReadsBuffer.size() > 0 && clusterBuffer.size() > 0)
-			{
-			  
-			  printClusters(clusterBuffer, clusterFiles, uniqueReadsBuffer, uniqueOut, files, tid);
+			{			  
+			  printClusters(clusterBuffer, clusterFiles, uniqueReadsBuffer, qualityBuffer, uniqueOut, files, tid);
 		      	}
 
 	      
 		      clusterBuffer.clear();
 		      uniqueReadsBuffer.clear();
+		      qualityBuffer.clear();
+		      
 		    }
 
 
@@ -1415,12 +1441,37 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		    //	break;
 		    //}
     
-		    
+		    //check every base of the unique kmer if any of them have poor quality mark
+		    //the read as a poor quality read
+		    long limit=(i+kmerSize);
+		    for(k=i; k<limit; k++)
+		    {
+
+		      //checking the quality of the base for the new kmer  
+		      //assuming quality is sanger format
+		      quality=int(workNodePtr->qualityScores[j][k])-33;
+		      
+			if(quality<=10)
+			  {
+			    
+
+
+
+			    goodQuality=false;
+			    break;
+			  }
+
+			
+		    }
+
+
 		    if(fastq)
 		      {
 			 
 			if(kmerCounter==0)
 			  {
+
+
 			  	      
 			    
 			    uniqueReadsBuffer.push_back(workNodePtr->chunk[j]); //store the read sequence
@@ -1480,14 +1531,20 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 	      if(kmerCounter>=1)
 		{
 
-
 		  //continue;
 
 		  if(isUnique)
 		    {
+
+		      
+
+
+
+
 		  //check to see if read can be assigned to an existing cluster
 		      if(clusterKmers.count(key)>0)
 			{
+
 
 
 			  clusterIndex=clusterKmers[key];
@@ -1512,7 +1569,20 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			    }
 			  */
 
-		
+			  //adding in flag indicating if kmer contains a poor quality base
+			  if(goodQuality)
+			    {
+			      qualityBuffer.push_back(1);
+			    }
+			  else{
+			    
+			    qualityBuffer.push_back(0);
+			  }
+
+
+
+
+
 			  //adding a new line to the existing buffer that holds cluster reads
 			  clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterIndex)} );
 		     
@@ -1534,17 +1604,36 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 				}
 			    }
 
+
+
+
 			  break;
 			}else if(clusterKmers.count(reversedKey)>0)
 			{
+
+
+
+
+
 			      //if read matches existing cluster on reverse strand reverse complement and add to cluster
 			  clusterIndex=clusterKmers[reversedKey];
 			  revComplement(workNodePtr->chunk[j]);
 
+
+			  if(goodQuality)
+			    {
+			      qualityBuffer.push_back(1);
+			    }
+			  else{
+			    
+			    qualityBuffer.push_back(0);
+			  }
+			  
+
+
 			  //adding a new line to the existing cluster
 			  clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterIndex)} );
 		      
-
 			  
 
 			  /*
@@ -1593,23 +1682,27 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 				}
 			    }
 
+			  
+
+
 			  break;  
 			}
+		    
+		      
+
 		    }
 		
 
 		  //if have obtained the set of all possible unique kmers or reached the end of the read or reached the end of unique kmers
 		  //then generate a new cluster if no assignment can be made
 		  ///		  if(i==0)
-		  //if(kmerCounter==kmerSize || i==0 || i==workNodePtr->chunk[j].length()-1 || !(isUnique))
-		  if(i==0)  
-		  {
+		  if(kmerCounter==kmerSize || i==0 || i==workNodePtr->chunk[j].length()-1 || !(isUnique))  
+		    {
 
 		      //cerr<<"inside this if statement "<<endl;
 		      //exit(0);
 
-
-
+		    
                      #pragma omp critical(CREATE_CLUSTER)
 		      {
 		
@@ -1645,6 +1738,19 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 			//assign add a new row to the cluster matrix holding the reads
 			//only possible using C++11
+			if(goodQuality)
+			  {
+			    qualityBuffer.push_back(1);
+			  }
+			else{
+			    
+			  qualityBuffer.push_back(0);
+			}
+
+			
+
+
+			  
 			clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterCtr)} );
                 
 		      }
@@ -1656,7 +1762,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		    
  
 		      
-		    }
+		  }
 		    
 
 		}
@@ -1686,8 +1792,10 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		
 
   //flush whatever is left in the buffers
-      printClusters(clusterBuffer, clusterFiles, uniqueReadsBuffer, uniqueOut, files, tid);
-    }
+      printClusters(clusterBuffer, clusterFiles, uniqueReadsBuffer, qualityBuffer, uniqueOut, files, tid);
+    
+
+}
 		      
 
   //free the memory allocated to the work node
@@ -2193,11 +2301,12 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 {
   
   ifstream clusterFile;
-  string line, read, clusterIdentifier;
+  string line, read, clusterIdentifier, qualityFlag;
   uint_fast64_t clusterID, i;
   // ReadCluster cluster;
+  long quality;
 
-  const int maxBufferSize=10000;
+  const int maxBufferSize=50000;
 
   vector<string> contigBuffer; //holds the set of assembled contigs will write them to a file when they get to large
   contigBuffer.reserve(maxBufferSize);
@@ -2212,6 +2321,10 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
   dense_hash_map<uint_fast64_t, vector<string> *, customHash> clusters; //hash table key is cluster ID value is a pointer to the  set of reads that belong to that cluster
   clusters.set_empty_key(-1);
+
+  dense_hash_map<uint_fast64_t, long, customHash> qualityCtrs; //hash table key is cluster ID value is a ctr represening the sum of the quality flags will sum up number of reads whose unique kmer contains no poor quality bases
+  qualityCtrs.set_empty_key(-1);
+
 
   
       clusterFile.open(fileName.c_str(), ifstream::in);
@@ -2230,11 +2343,18 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
       //object will convert string to a stream so can use things like getline on it
 	  istringstream iss(line);
       
-      //can parse string this way because words seperated by a space
-	  iss>>read>>clusterIdentifier;
+      //can parse string this way because words seperated by spaces
+	  iss>>read>>clusterIdentifier>>qualityFlag;
 
       //convert from string into and integer
 	  clusterID=stoi(clusterIdentifier);
+	  
+	  quality=stoi(qualityFlag); //storing the quality
+
+
+	  
+	  
+
 
       //check to see if cluster already exists in hash table
       //if cluster exists then add read to existing cluster
@@ -2242,9 +2362,13 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	  if(clusters.count(clusterID)>0)
 	    {
 	      clusters[clusterID]->push_back(read);
+	      qualityCtrs[clusterID]=qualityCtrs[clusterID]+quality;
+	    
 	    }else
 	    {
-	      clusters[clusterID]=new vector<string>; //##########NEED to Delete Memory MEMORY LEEK REMEMBER TO HANDLE###################
+
+	      qualityCtrs[clusterID]=quality;
+	      clusters[clusterID]=new vector<string>; //##########NEED to Delete Memory MEMORY LEEK REMEMBER TO HANDLE################### (fixed)
 	      clusters[clusterID]->push_back(read);//###############IMPORTANT LOREN SEE ABOVE##################
 	    }
 
@@ -2260,8 +2384,10 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
       
       int temp=0;
 
+      double ratio;
+
       //go through the set of clusters removing duplicates doing some filtering based on number of remaining reads 
-      //then assemble reads using seqAn library functions
+      //then assemble reads
       for(iter; iter!=clusters.end(); iter++)
 	{
 
@@ -2275,7 +2401,20 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	    }
 	  */
 
+	 
 
+	  ratio=(double(qualityCtrs[iter->first])/iter->second->size());
+	  //cout<<ratio<<endl;
+
+	  
+	  if(ratio< 0.2) //if the number of reads that contains good quality kmers is less than 30% of the reads in the cluster than throw away cluster
+	    {
+	      continue;
+	    }
+
+
+	  
+	 
 
 	  //deduplicating reads
 	  sort( iter->second->begin(), iter->second->end() );
@@ -2288,6 +2427,13 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	  if(iter->second->size()> cutoffClusterSize)
 	    {
 	     
+	      
+	      if(iter->first==374535)
+		{
+		  cout<<"passed the second checkpoint "<<endl;
+		}
+
+
 
 
 
@@ -2299,6 +2445,8 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	      cluster.setKmerSize(clusterKmerSize);
 	      uint_fast64_t maxKmer=cluster.getKmers();
 	      
+	      // uint_fast64_t maxKmer=1;
+
 	    
 
 	      //std::pair<uint_fast64_t, long> pair=cluster.getPair(0);
@@ -2317,6 +2465,15 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 		  //cluster.printStartPositions();
 		 
 		  string contig=cluster.mergeReads(clusterKmerSize, 2, debuggingMatrix);
+
+		  if(iter->first==374535)
+		    {
+		      cout<<"contig is  "<<contig<<endl;
+		    }
+
+
+
+		  // string contig="AAAAAAA";
 
 		  if(contig.compare("0")!=0) //if a valid contig i.e. not equal to 0 then add it to the clusterBuffer
 		    {
