@@ -85,7 +85,7 @@ void ReadCluster::printReads()
 }
 
 //kmer size and a cutoff representing the minimum number of times the max nucleotide must occur to be counted
-string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &debugging)
+string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &debugging, long clusterID)
 {
 
   long int numCol;
@@ -138,8 +138,6 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
       }
 
 
-      //cerr<<"on Read "<<i<<endl;
-      
       int start=(numCol/2)-startPositions[i];
       int ctr=0;
       //cerr<<"start is "<<start<<endl;
@@ -167,7 +165,7 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
    
   //Now adding in reads that were not assembled in the previous step
   //algorithim: For a read that was not assembled look for a kmer in common with a read that was assembled 
-  //line up the unassembled read with the read that is assembled
+  //line up the unassembled read with the read that is assembled based on the kmer in common
 
   while(ctrUnassembled!=0)
     {
@@ -212,6 +210,21 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
 			      int start=(startMatrix[j]+kmerPositions[j][kmer])-kmerPositions[i][kmer]; //line up the start positions of the kmer in common between the assembled and unassembled read 
 			      int ctr=0;
 			  
+			      /*
+			      if(readSeqs[i].compare("CACCAATATGGCACATGTATACATATGTAACAAACCTGCACGTTGTGCACATGTACCCTAGAACTTAAAGTATAATGAAAAAAAAAAGCAATATAGATCGG")==0)
+				{
+				  //				  cout<<"start position is "<<start<<" startMatrix is "<<startMatrix[j]<<" kmer position in assembled read is "<<kmerPositions[j][kmer]<<" kmer position in unassembled read is "<<kmerPositions[i][kmer]<<endl;
+				  //cout<<" assembled read is "<<j<<" index of unassembled read is "<<i<<endl;
+				  
+				  cout<<"kmer in assembled Read is "<<bit2String(kmer, kmerSize)<<" string extracted from read is "<<readSeqs[j].substr(kmerPositions[j][kmer], kmerSize)<<endl;
+				  cout<<"kmer in unassembled Read is "<<bit2String(kmer, kmerSize)<<" string extracted from unassembled read is "<<readSeqs[i].substr(kmerPositions[i][kmer], kmerSize)<<endl;
+				  
+				  //exit(0);
+
+				}
+			      */
+
+
 			  //cerr<<"for read "<<i<<" on kmer "<<kmer<<" matching kmer position is "<<kmerPositions[j][kmer]<<" start is "<<start<<endl;
      
 			  //cerr<<"for read "<<i<<"start is "<<start<<endl;
@@ -221,7 +234,8 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
 			      if(start<0) //if read extends off the beginning of the matrix dynamically insert new columns at the beginning of the matrix very inefficient operation :(
 				{
 				  //cerr<<"reallocating at the beginning "<<endl;
-				  
+				 
+				 
 				  start=start+(readSize*2);
 
 				  int z;
@@ -237,6 +251,10 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
 			      if((start+readSize)>matrix[i].size()) //if read extends off the end of the matrix dynamically insert new columns at the end of the matrix 
 				{
 				  //cerr<<"reallocating at the end "<<endl;
+
+
+
+				 
 
 
 				  for(z=0; z<matrix.size(); z++)
@@ -397,23 +415,14 @@ flag=false;
       indexMax=-1;
       indexMax=distance(nuc.begin(), std::max_element(nuc.begin(), nuc.end()));
 
+
+      
       if(nuc[indexMax] > cutoffMinNuc && ((nuc[indexMax]/nucCtr) > 0.75)) //filtering clusters
 	{
-	  flag=true;
-	  
+	  flag=true;	  
 	  //cout<<nuc[indexMax]<<endl;
 	  combinedNuc+=allNucs[indexMax];
 
-	  /*	  
-	  for(z=0; z<nuc.size(); z++)
-	    {
-	      cout<<nuc[z]<<" ";
-
-	    }
-	  cout<<endl;
-
-	  cout<<"column is "<<i<<" adding  "<<allNucs[indexMax]<<" count is "<<nuc[indexMax]<<" index max is "<<indexMax<<endl;
-	  */
 	}else
 	{
 
@@ -427,13 +436,30 @@ flag=false;
 
 	}
 
+ 
+
+
+
+
+/*
+      if(nuc[indexMax]>cutoffMinNuc)
+	{	
+	  combinedNuc+=allNucs[indexMax];	  
+	}
+
+*/
+
+
+
 
       if(((nuc[indexMax]/nucCtr) < 0.75))
 	{
 	  badColCtr++;
 	}
-
+      
     
+
+
     }
   
 
@@ -482,6 +508,10 @@ flag=false;
       return "0";
     }
 
+
+
+
+
   if((badColCtr/combinedNuc.length())>0.1) //if to many bad columns throw it out
     {
       return "0";
@@ -493,7 +523,7 @@ flag=false;
       combinedNuc="0";
     }
     
-  
+
 
 
   //cerr<<"reached this point in merge cluster "<<combinedNuc<<endl;

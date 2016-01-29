@@ -1260,12 +1260,6 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 	  //secondKey=reversedKey;
 	  //startSecondKmer=i+1;
 
-	  if(workNodePtr->chunk[j].compare("TTTAGCCAATTAGCAAAGCTCATGGACACACAGAATATGTCTTTCAACAGCCACACAAATACATTTTATACTTTTTTTTCTTTTCTTTTTTTTTTATTTT")==0)
-	    {
-	      cout<<"i is "<<i<<endl;
-
-	    }
-
 
 
 	   //if character is not a nucleotide reset the bit string and start over
@@ -1377,11 +1371,6 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		  if(iter->second > 254 || revIter->second > 254)
 		  {
 		    
-		    if(workNodePtr->chunk[j].compare("TTTAGCCAATTAGCAAAGCTCATGGACACACAGAATATGTCTTTCAACAGCCACACAAATACATTTTATACTTTTTTTTCTTTTCTTTTTTTTTTATTTT")==0)
-		      {
-			cerr<<"inside max cutoff if condition "<<endl;
-
-		      }
 
 
 
@@ -1914,6 +1903,8 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
       files.push_back(make_shared<ofstream>(line, std::ios::out ));
     }
   
+  
+
   //return(fileNames);
 
 
@@ -2428,11 +2419,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	    {
 	     
 	      
-	      if(iter->first==374535)
-		{
-		  cout<<"passed the second checkpoint "<<endl;
-		}
-
+	    
 
 
 
@@ -2464,12 +2451,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 		  cluster.setStartPositions(maxKmer);
 		  //cluster.printStartPositions();
 		 
-		  string contig=cluster.mergeReads(clusterKmerSize, 2, debuggingMatrix);
-
-		  if(iter->first==374535)
-		    {
-		      cout<<"contig is  "<<contig<<endl;
-		    }
+		  string contig=cluster.mergeReads(clusterKmerSize, 2, debuggingMatrix, iter->first);
 
 
 
@@ -2517,6 +2499,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	}
 
       
+
       
 #pragma omp critical(FLUSHING_CLUSTER) //flush last contigs left in buffer to a file
 	      {
