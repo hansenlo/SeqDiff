@@ -2,6 +2,7 @@
 #include "utilities.h"
 
 
+
 using google::dense_hash_map;
 using google::sparse_hash_map;
 using std::cout;
@@ -16,6 +17,9 @@ using std::istringstream;
 using std::to_string;
 using std::list;
 using std::make_shared;
+using std::unordered_map;
+
+
 
 inline void countKmers(sparse_hash_map<uint_fast64_t, int, customHash> &controlKmers, char nextLineFlag, string inputFile, int kmerSize)
 {
@@ -372,7 +376,7 @@ void countUniqueKmers(sparse_hash_map<uint_fast64_t, int, customHash>  &controlK
   //sparse_hash_map<uint_fast64_t, int, customHash> allKmers;
   //dense_hash_map<uint_fast64_t, int, customHash> denseKmers;
 
-  //denseKmers.set_empty_key(-1);
+  //denseKmers.set_empty_key(-20);
   //denseKmers.resize(3000000000);
 
   //code to place binary represenation into right side of bit string. 
@@ -660,7 +664,7 @@ void countUniqueKmers(sparse_hash_map<uint_fast64_t, int, customHash>  &controlK
 
 		if(qualityReadIn==false)
 		  {
-		//checking to see if base has poor quality if so reset the string 
+		//checking to see if base has poor quality if so reset the counters
 		    getline(seqFile, temp);
 		    getline(seqFile, qualityScores);
 		    quality=int(qualityScores[i])-33;
@@ -775,7 +779,7 @@ void readUniqueKmers(dense_hash_map<uint_fast64_t, int, customHash>  &uniqueKmer
   string line, qualityScores, temp, foo, word, kmer;
   char continueFlag, start;
   int ctr, i, revControlValue, controlValue, quality, kmerCtr;
-  long totalCtr;
+  long totalCtr, limit;
   bool fastq, flag, secondTime, usedRead, qualityReadIn;
   uint_fast64_t index, reversedKey, firstKey, secondKey;
 
@@ -790,7 +794,7 @@ void readUniqueKmers(dense_hash_map<uint_fast64_t, int, customHash>  &uniqueKmer
   //sparse_hash_map<uint_fast64_t, int, customHash> allKmers;
   //dense_hash_map<uint_fast64_t, int, customHash> denseKmers;
 
-  //denseKmers.set_empty_key(-1);
+  //denseKmers.set_empty_key(-20);
   //denseKmers.resize(3000000000);
 
   //code to place binary represenation into right side of bit string. 
@@ -881,6 +885,7 @@ void readUniqueKmers(dense_hash_map<uint_fast64_t, int, customHash>  &uniqueKmer
 
       //can parse string this way because words seperated by a space
       iss>>kmer>>word;
+
 
       //convert from string into and integer
       kmerCtr=stoi(word);
@@ -1007,8 +1012,11 @@ void readUniqueKmers(dense_hash_map<uint_fast64_t, int, customHash>  &uniqueKmer
 	      reversedKey=reversedKey>>(64-kmerSize*2);
 	      */
 
-	      //cout<<"key is "<<key<<"\t"<<bit2String(key, kmerSize)<<endl;
+	      //std::bitset<64> bitRep2(key);
+	      //cout<<" index is  "<<i<<endl;
+	      //cout<<bitRep2<<endl;
 
+	     
 	      uniqueKmers[key]=kmerCtr;
 	 
 
@@ -1063,7 +1071,7 @@ void printSingleCluster( dense_hash_map<uint_fast64_t, long, customHash> &cluste
 
 	     	      
 //function to print out the clusters of reads and all unique reads
-void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_fast64_t, int, customHash> &clusterFiles, vector< string > &uniqueReadsBuffer, std::vector<int> &qualityBuffer, ofstream &uniqueOut, vector<std::shared_ptr<ofstream> > &files, int tid)
+void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_fast64_t, int, customHash> &clusterFiles, vector< string > &uniqueReadsBuffer, std::vector<int> &qualityBuffer, std::vector<string> &qualityStringBuffer, ofstream &uniqueOut, vector<std::shared_ptr<ofstream> > &files, int tid)
 {
   long j;
 
@@ -1075,7 +1083,6 @@ void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_
 
 
 
-
       //clusterFiles[stoull(clusterBuffer[j][1])]
 			  
       //somewhat confusing did this for performance reasons clusterBuffer[j][1] contains the clusterID
@@ -1084,9 +1091,10 @@ void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_
       //the vector files contains a set of ofstream pointers to different file output objects
 #pragma omp critical(PRINT_ALL_UNIQUE_READS)
       {
-	*(files[clusterFiles[stoull(clusterBuffer[j][1])]])<<clusterBuffer[j][0]<<"\t"<<clusterBuffer[j][1]<<"\t"<<qualityBuffer[j]<<endl;
+	*(files[clusterFiles[stoull(clusterBuffer[j][1])]])<<clusterBuffer[j][0]<<"\t"<<clusterBuffer[j][1]<<"\t"<<qualityBuffer[j]<<"\t"<<qualityStringBuffer[j]<<endl;
       }
 		 
+
     }
 
   //cerr<<"size of vector is "<<uniqueReadsBuffer.size()<<"\n";
@@ -1098,14 +1106,14 @@ void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_
 
 
   		      
-  for(j=0; j<(uniqueReadsBuffer.size()-1); j+=2)
+  for(j=0; j<(uniqueReadsBuffer.size()-2); j+=3)
     {
 
 
 #pragma omp critical(PRINT_CLUSTERS)
       {
 
-	uniqueOut<<"@"<<j<<"\n"; //fastq read header
+	uniqueOut<<"@"<<j<<"_"<<uniqueReadsBuffer[j+2]<<"\n"; //fastq read header appending which cluster the read belongs into the header
 	uniqueOut<<uniqueReadsBuffer[j]<<"\n"; //sequence
 	uniqueOut<<"+"<<"\n"; //spacer line
 	uniqueOut<<uniqueReadsBuffer[j+1]<<"\n"; //quality scores
@@ -1139,13 +1147,15 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
   string line, header, tempLine;
   char continueFlag, start;
   long ctr, i, revControlValue, controlValue, kmerCounter, j, NCtr, k;
-  long totalCtr, startFirstKmer, startSecondKmer, lineCtr;
+  long totalCtr, startFirstKmer, startSecondKmer, lineCtr, limit;
   bool fastq, flag, secondTime, usedRead, presentCluster, foundCluster, isUnique;
   uint_fast64_t index, reversedKey, firstKey, secondKey, tempKey, posKey, negKey, first, middle, end, currentUniqueKey;
   uint_fast64_t lastKey, clusterIndex, randomFileIndex, tempValue;
-  int posMaxInter, posSecondBestInter, negMaxInter, negSecondBestInter, quality;
+  int posMaxInter, posSecondBestInter, negMaxInter, negSecondBestInter, quality, firstKeyIndex, currentUniqueKeyIndex, poorQualityCtr;
   long distanceFirstKey; //the distance in basepairs from the current key only add the first key to the cluster if the distance is less than kmer size from the first key
   //I am doing this to avoid chaining together reads into super contigs
+
+  int poorQualityCutoff;
 
 
   string validChar = "ACGTacgtN";
@@ -1166,6 +1176,12 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
   //creating a vector to act as a buffer to hold reads that contain a unique word
   vector< string > uniqueReadsBuffer;
   clusterBuffer.reserve(100000);
+
+
+  
+  vector< string > qualityStringBuffer; //creating a vector to act as a buffer to hold the quality score string for each read that goes into the buffer of clusters
+  qualityStringBuffer.reserve(100000);
+
 
  
   //building the look up table to reverse nucleotide bit strings
@@ -1342,6 +1358,10 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 	      reversedKey=reversedKey>>(64-kmerSize*2);
 
+	      //#pragma omp critical(PRINT_REVERSEDKEY)
+		//{
+	      //cout<<"reversedKey is "<<reversedKey<<"\t key translated from bit string is "<<bit2String(reversedKey, kmerSize)<<" bit representation is "<<std::bitset<64>(reversedKey)<<endl;
+	      //}
 
 	      isUnique=false;
 
@@ -1372,8 +1392,6 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		  {
 		    
 
-
-
 		    break;
 		  }
 
@@ -1389,20 +1407,21 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		    
 		      if(uniqueReadsBuffer.size() > 0 && clusterBuffer.size() > 0)
 			{			  
-			  printClusters(clusterBuffer, clusterFiles, uniqueReadsBuffer, qualityBuffer, uniqueOut, files, tid);
+			  printClusters(clusterBuffer, clusterFiles, uniqueReadsBuffer, qualityBuffer, qualityStringBuffer, uniqueOut, files, tid);
 		      	}
 
 	      
 		      clusterBuffer.clear();
 		      uniqueReadsBuffer.clear();
 		      qualityBuffer.clear();
-		      
+		      qualityStringBuffer.clear();
+
 		    }
 
 
 		  isUnique=true;
 		  currentUniqueKey=key;
-		 
+		  currentUniqueKeyIndex=i;
 		  
 		  //dynamic_bitset<> bitRep(64, key);
 		  //cout<<bitRep<<endl;
@@ -1423,13 +1442,26 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		  if(kmerCounter==0){
 
 		    firstKey=key;
-		   
+		    firstKeyIndex=i;
+
 		    //maybe keep this in
 		    //if(i==0)
 		    //{
 		    //	break;
 		    //}
-    
+
+		    
+
+		    //check the base that made it unique check to see if it is a good quality base
+		    quality=int(workNodePtr->qualityScores[j][i])-33;
+		    
+		    if(quality<=10)
+		      {
+			goodQuality=false;
+		      }
+
+
+		    /*
 		    //check every base of the unique kmer if any of them have poor quality mark
 		    //the read as a poor quality read
 		    long limit=(i+kmerSize);
@@ -1443,15 +1475,13 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			if(quality<=10)
 			  {
 			    
-
-
-
 			    goodQuality=false;
 			    break;
 			  }
 
 			
 		    }
+		    */
 
 
 		    if(fastq)
@@ -1463,11 +1493,8 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 			  	      
 			    
-			    uniqueReadsBuffer.push_back(workNodePtr->chunk[j]); //store the read sequence
-			    uniqueReadsBuffer.push_back(workNodePtr->qualityScores[j]); //store the quality scores
-
-			    //cout<<tempLine<<endl;
-			      //cout<<">?>:BCC<ADCCBA;AABA7@ABBAA@CCBA>ABCAAAAACCAA@><B<A??BCA?>>?AAA=>?A:;5:6AB=6/5;;37:6@=A><;>;@:>:B>7###"<<endl;
+			    //  uniqueReadsBuffer.push_back(workNodePtr->chunk[j]); //store the read sequence
+			    //uniqueReadsBuffer.push_back(workNodePtr->qualityScores[j]); //store the quality scores
 
 			    ctr=1;
 			    
@@ -1525,10 +1552,6 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		  if(isUnique)
 		    {
 
-		      
-
-
-
 
 		  //check to see if read can be assigned to an existing cluster
 		      if(clusterKmers.count(key)>0)
@@ -1570,15 +1593,52 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 
 
+			  if(kmerCounter==1)
+			    {
+			      //only outputting those unique reads that are placed in a cluster
+			      uniqueReadsBuffer.push_back(workNodePtr->chunk[j]); //store the read sequence
+			      uniqueReadsBuffer.push_back(workNodePtr->qualityScores[j]); //store the quality scores
+			      uniqueReadsBuffer.push_back(to_string(clusterIndex)); //store the cluster it belongs to
+			 
+			    }
 
 
 			  //adding a new line to the existing buffer that holds cluster reads
+			  qualityStringBuffer.push_back(workNodePtr->qualityScores[j]);
 			  clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterIndex)} );
 		     
 		      //if first word not already in cluster then add it
 			  //do not have to worry about last word since last word is  the current word 
 			  if(kmerCounter>1)
 			    {
+
+
+			      /*
+			      //if the new kmer has to many poor quality bases do not add it to the cluster
+			      limit=(firstKeyIndex+kmerSize);
+			      poorQualityCtr=0;
+			      for(k=firstKeyIndex; k<limit; k++)
+				{
+		      //checking the quality of the base for the new kmer  
+		      //assuming quality is sanger format
+				  quality=int(workNodePtr->qualityScores[j][k])-33;
+			  
+				  if(quality<=10)
+				    {
+				      poorQualityCtr++;
+				    }
+				  
+				}
+
+			      poorQualityCutoff=2; //if first Kmer contains to many poor quality bases than do not add this key as a kmer to the cluster
+			      if(poorQualityCtr>poorQualityCutoff)
+				{
+				  break;
+				}
+			      
+			      */
+
+
 			      
 			      //      if(clusterKmers.count(firstKey)==0)
 			
@@ -1619,10 +1679,23 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			  }
 			  
 
+			  std::reverse(workNodePtr->qualityScores[j].begin(), workNodePtr->qualityScores[j].end()); //reverse the quality scores
+
+
+			  if(kmerCounter==1)
+			    {
+			      //only outputting those unique reads that are placed in a cluster
+			      uniqueReadsBuffer.push_back(workNodePtr->chunk[j]); //store the read sequence
+			      uniqueReadsBuffer.push_back(workNodePtr->qualityScores[j]); //store the quality scores
+			      uniqueReadsBuffer.push_back(to_string(clusterIndex)); //store the cluster it belongs to
+			 
+			    }
+
 
 			  //adding a new line to the existing cluster
 			  clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterIndex)} );
-		      
+			  qualityStringBuffer.push_back(workNodePtr->qualityScores[j] );
+			  
 			  
 
 			  /*
@@ -1660,6 +1733,32 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			    {
 			      //if(clusterKmers.count(reversedKey)==0)
 			
+
+			      /*
+			      limit=(firstKeyIndex+kmerSize);
+			      poorQualityCtr=0;
+			      for(k=firstKeyIndex; k<limit; k++)
+				{
+		      //checking the quality of the base for the new kmer  
+		      //assuming quality is sanger format
+				  quality=int(workNodePtr->qualityScores[j][k])-33;
+			  
+				  if(quality<=10)
+				    {
+				      poorQualityCtr++;
+				    }
+				  
+				}
+
+			      poorQualityCutoff=2; //if first Kmer contains to many poor quality bases than do not add this kmer as a key to the cluster
+			      if(poorQualityCtr>poorQualityCutoff)
+				{
+				  break;
+				}
+			      */
+
+
+
 			      if(clusterKmers.count(reversedKey)==0 && distanceFirstKey < ((2*kmerSize)-1))
 			     	{
 				 #pragma omp critical(ADD_REV_KEY_EXISTING_CLUSTER)
@@ -1682,6 +1781,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		    }
 		
 
+
 		  //if have obtained the set of all possible unique kmers or reached the end of the read or reached the end of unique kmers
 		  //then generate a new cluster if no assignment can be made
 		  ///		  if(i==0)
@@ -1691,7 +1791,56 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		      //cerr<<"inside this if statement "<<endl;
 		      //exit(0);
 
-		    
+
+		      /*
+		      //count the good quality bases in the firstKey and the current Unique Key only generate a cluster if firstKey contains mostly high quality bases
+			
+		      limit=(firstKeyIndex+kmerSize);
+		      poorQualityCtr=0;
+		      for(k=firstKeyIndex; k<limit; k++)
+			{
+		      //checking the quality of the base for the new kmer  
+		      //assuming quality is sanger format
+			  quality=int(workNodePtr->qualityScores[j][k])-33;
+			  
+			  if(quality<=10)
+			    {
+			      poorQualityCtr++;
+			    }
+			
+			}
+
+		      poorQualityCutoff=2; //if first Kmer contains to many poor quality bases than do not create a new cluster with this kmer
+		      if(poorQualityCtr>poorQualityCutoff)
+			{
+			  break;
+			}
+
+			limit=(currentUniqueKeyIndex+kmerSize);
+			poorQualityCtr=0;
+			for(k=currentUniqueKeyIndex; k<limit; k++)
+			  {
+			    //checking the quality of the base for the new kmer  
+			    //assuming quality is sanger format
+			    quality=int(workNodePtr->qualityScores[j][k])-33;
+		      
+			    if(quality<=10)
+			      {
+				poorQualityCtr++;
+			      }
+			
+			  }
+
+			poorQualityCutoff=3; //if last unique Kmer contains to many poor quality bases than do not create a new cluster with this kmer
+			if(poorQualityCtr>poorQualityCutoff)
+			  {
+			    break;
+			  }
+
+
+		      */
+
+
                      #pragma omp critical(CREATE_CLUSTER)
 		      {
 		
@@ -1699,20 +1848,9 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			/*
  			if(workNodePtr->chunk[j].compare("ATCAGAGTTAACTTTGCAGTGAGAGCGGCCTTGCTGCGGCCAAAGAACATGGAAAAGCATGANTGGGGTGATGTGCCTTAAAGCGTCAGACACTTGGGCCT")==0)
 			  {
-			    cerr<<"first key in make new cluster is "<<bit2String(firstKey, kmerSize)<<endl;
-			    cerr<<"second key is "<<bit2String(currentUniqueKey, kmerSize)<<endl;
-			  
-
-			    printClusters(clusterBuffer, clusterFiles, uniqueReadsBuffer, uniqueOut, files, tid);
-
-			    clusterBuffer.clear();
-			    uniqueReadsBuffer.clear();
-
-			    //exit(0);
-			  }
+			    }
 			*/
 		      
-
 
 	
 			clusterCtr++;
@@ -1736,12 +1874,21 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			  qualityBuffer.push_back(0);
 			}
 
-			
+			if(kmerCounter==1)
+			  {
+			    //only outputting those unique reads that are placed in a cluster
+			    uniqueReadsBuffer.push_back(workNodePtr->chunk[j]); //store the read sequence
+			    uniqueReadsBuffer.push_back(workNodePtr->qualityScores[j]); //store the quality scores
+			    uniqueReadsBuffer.push_back(to_string(clusterCtr)); //store the cluster it belongs to
+			 
+			  }
 
 
 			  
 			clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterCtr)} );
-                
+			qualityStringBuffer.push_back(workNodePtr->qualityScores[j]);
+			  
+
 		      }
 
 		      break;
@@ -1781,7 +1928,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		
 
   //flush whatever is left in the buffers
-      printClusters(clusterBuffer, clusterFiles, uniqueReadsBuffer, qualityBuffer, uniqueOut, files, tid);
+      printClusters(clusterBuffer, clusterFiles, uniqueReadsBuffer, qualityBuffer, qualityStringBuffer, uniqueOut, files, tid);
     
 
 }
@@ -1844,19 +1991,19 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
   srand (time(NULL));
 
   dense_hash_map<uint_fast64_t, int, customHash> refPositions; //hash table contains the positions of every unique word in the reference read
-  refPositions.set_empty_key(-1);
+  refPositions.set_empty_key(-20);
 
  
 
   dense_hash_map<uint_fast64_t, int, customHash> clusterFiles; //hash table key is a cluster id value is the index into the vector of output file names
-  clusterFiles.set_empty_key(-1);
+  clusterFiles.set_empty_key(-20);
   clusterFiles.resize(10000000);
 
 //hash table to hold the kmers assocated with each cluster
   dense_hash_map<uint_fast64_t, long, customHash> clusterKmers(10000000); //hash table key is kmer value is the cluster that kmer belongs to
   clusterKmers.resize(100000000);
 //dense_hash_map<uint_fast64_t, long, customHash> clusterKmers; //hash table key is kmer value is the cluster that kmer belongs to
-  clusterKmers.set_empty_key(-1);
+  clusterKmers.set_empty_key(-20);
 
 
 
@@ -1934,7 +2081,7 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
   sparse_hash_map<uint_fast64_t, ReadCluster *, customHash> ::iterator myHashIterator; //iterater for read cluster
   
   dense_hash_map<uint_fast64_t, int, customHash> readPositions;
-  readPositions.set_empty_key(-1);
+  readPositions.set_empty_key(-20);
 
 
   //code to place binary represenation into right side of bit string. 
@@ -2292,7 +2439,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 {
   
   ifstream clusterFile;
-  string line, read, clusterIdentifier, qualityFlag;
+  string line, clusterIdentifier, qualityFlag, qualityString, read;
   uint_fast64_t clusterID, i;
   // ReadCluster cluster;
   long quality;
@@ -2301,6 +2448,10 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
   vector<string> contigBuffer; //holds the set of assembled contigs will write them to a file when they get to large
   contigBuffer.reserve(maxBufferSize);
+
+  vector<uint_fast64_t> contigIDs; //holds the set of contigIDs for the assembled clusters will write them out with the contigs 
+  contigBuffer.reserve(maxBufferSize);
+
   
 
   #pragma omp critical(DEBUGGING_GETCLUSTER)
@@ -2309,13 +2460,36 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	}
 
 
+	
+	//dense_hash_map<uint_fast64_t, dense_hash_map<string, int, customHash> *, customHash> clusters; //hash table key is cluster ID value is a pointer to a hash table containing the  set of reads that belong to that cluster
 
-  dense_hash_map<uint_fast64_t, vector<string> *, customHash> clusters; //hash table key is cluster ID value is a pointer to the  set of reads that belong to that cluster
-  clusters.set_empty_key(-1);
+	/*	
+	dense_hash_map<uint_fast64_t, dense_hash_map<string, int, customHash>, customHash> clusters;
+	clusters.set_empty_key(-20);
 
-  dense_hash_map<uint_fast64_t, long, customHash> qualityCtrs; //hash table key is cluster ID value is a ctr represening the sum of the quality flags will sum up number of reads whose unique kmer contains no poor quality bases
-  qualityCtrs.set_empty_key(-1);
+	dense_hash_map<string, int, customHash> temp;
+	temp.set_empty_key("ZZZZZZ");
+	
+	clusters[1]=temp;
 
+	clusters[1]["temp"]=2;
+
+	cerr<<"reached this point "<<endl;
+	cerr<<"value stored is "<<clusters[1]["temp"]<<endl;
+	*/
+	
+	
+	unordered_map<uint_fast64_t, unordered_map<string, string>* > clusters; //hash table key is the cluster id value is a hash table containing the set of reads for that cluster key for the inner hash table is the read value is the quality string for that read 
+
+
+
+	//clusters[1]->operator[](1)=1;
+
+
+	dense_hash_map<uint_fast64_t, long, customHash> qualityCtrs; //hash table key is cluster ID value is a ctr represening the sum of the quality flags will sum up number of reads whose unique kmer contains no poor quality bases
+	qualityCtrs.set_empty_key(-20);
+	
+	
 
   
       clusterFile.open(fileName.c_str(), ifstream::in);
@@ -2325,25 +2499,28 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	  exit(EXIT_FAILURE);
 	}
 
+      
 
       while(clusterFile.good())  //read in all the clusters
 	{
       
+
 	  getline(clusterFile, line);
         
       //object will convert string to a stream so can use things like getline on it
 	  istringstream iss(line);
       
       //can parse string this way because words seperated by spaces
-	  iss>>read>>clusterIdentifier>>qualityFlag;
+	  iss>>read>>clusterIdentifier>>qualityFlag>>qualityString;
+	  
 
+
+	 
       //convert from string into and integer
-	  clusterID=stoi(clusterIdentifier);
+	  clusterID=stoull(clusterIdentifier, NULL, 10);
 	  
-	  quality=stoi(qualityFlag); //storing the quality
+	  quality=stoull(qualityFlag, NULL, 10); //storing the quality
 
-
-	  
 	  
 
 
@@ -2352,24 +2529,38 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
       //otherwise add an entry into hash table
 	  if(clusters.count(clusterID)>0)
 	    {
-	      clusters[clusterID]->push_back(read);
-	      qualityCtrs[clusterID]=qualityCtrs[clusterID]+quality;
-	    
+	      /*
+	      if(clusterID==373437)
+		{
+		  cerr<<"read being added is "<<read<<endl;
+		  cerr<<"quality string being added is "<<qualityString<<endl;
+
+		}
+	      */	     
+
+	      (*clusters[clusterID])[read]=qualityString; //adding a new read and associated quality string to the cluster using a hash table ensures duplicate reads are removed
+	     
+	      qualityCtrs[clusterID]=qualityCtrs[clusterID]+quality; //keeping track of the number of reads with high quality bases close to the unique word(s)
+
+
 	    }else
 	    {
-
 	      qualityCtrs[clusterID]=quality;
-	      clusters[clusterID]=new vector<string>; //##########NEED to Delete Memory MEMORY LEEK REMEMBER TO HANDLE################### (fixed)
-	      clusters[clusterID]->push_back(read);//###############IMPORTANT LOREN SEE ABOVE##################
+
+	      //clusters[clusterID]=new vector<string>; //##########NEED to Delete Memory MEMORY LEEK REMEMBER TO HANDLE################### (fixed)
+	      //clusters[clusterID]->push_back(read);//###############IMPORTANT LOREN SEE ABOVE##################
+
+	      clusters[clusterID]=new unordered_map<string, string>; //adding a new hash table to hold the read sequence and quality string for the read	     
+	      (*clusters[clusterID])[read]=qualityString; //adding the matching quality string to the inner hash table
 	    }
 
 
 	}
     
+
+      
       clusterFile.close();
-    
-
-
+      
 
       auto iter=clusters.begin();
       
@@ -2377,90 +2568,85 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
       double ratio;
 
+      /*
+#pragma omp critical(DEBUGGING_READINCLUSTER)
+      {
+	cerr<<"thread "<<tid<<" finished reading in all clusters from the file "<<fileName<<endl;
+      }
+      
+      */
+
+
       //go through the set of clusters removing duplicates doing some filtering based on number of remaining reads 
       //then assemble reads
       for(iter; iter!=clusters.end(); iter++)
 	{
 
 	  //cout<<"size of cluster "<<iter->first<<" is "<<iter->second->size()<<endl;
-
-	  /*
-	  auto vectorIter=iter->second->begin();
-	  for(vectorIter; vectorIter!=iter->second->end(); vectorIter++)
-	    {
-	      cout<<*vectorIter<<endl;
-	    }
-	  */
-
 	 
 
 	  ratio=(double(qualityCtrs[iter->first])/iter->second->size());
 	  //cout<<ratio<<endl;
 
 	  
-	  if(ratio< 0.2) //if the number of reads that contains good quality kmers is less than 30% of the reads in the cluster than throw away cluster
+	  if(ratio< 0.3) //if the number of reads that contains good quality kmers is less than 30% of the reads in the cluster than throw away cluster
 	    {
 	      continue;
 	    }
 
-
-	  
 	 
 
 	  //deduplicating reads
-	  sort( iter->second->begin(), iter->second->end() );
+	  //sort( iter->second->begin(), iter->second->end() );
 	  //iter->second->erase( unique( iter->second->begin(), iter->second->end() ), iter->second->end() );
-	  auto last=unique(iter->second->begin(), iter->second->end());
-	  iter->second->erase(last, iter->second->end());
-
-	 
+	  //auto last=unique(iter->second->begin(), iter->second->end());
+	  //iter->second->erase(last, iter->second->end());
+	  
 	  //number of reads in cluster cutoff
 	  if(iter->second->size()> cutoffClusterSize)
 	    {
-	     
+
+
+	      //#pragma omp critical(DEBUGGING_PROCESSINGCLUSTER)
+	      //{
+	      //cerr<<"thread "<<tid<<" is on cluster "<<iter->first<<endl;
+	      // }  
 	      
-	    
-
-
-
 
 	      ReadCluster cluster(iter->second->size()); //input paramater is number of reads in the cluster
-
 	    
+
+	      
 	      //adding the sequences to the cluster
-	      cluster.addSequences(*(iter->second));
+	      cluster.addSequences(iter->second);
 	      cluster.setKmerSize(clusterKmerSize);
 	      uint_fast64_t maxKmer=cluster.getKmers();
 	      
+
+
+
 	      // uint_fast64_t maxKmer=1;
 
-	    
-
-	      //std::pair<uint_fast64_t, long> pair=cluster.getPair(0);
-	      
-	      //cerr<<"maxKmer is "<<maxKmer<<endl;
-	      //cerr<<"highest pair is "<<pair.first<<endl;
-
-	      //cout<<cluster.getNumReads()<<"\t"<<pair.second<<endl;
-
-	      //if(pair.second==cluster.getNumReads())
-	      //{
-		  //cerr<<pair.second<<"\t"<<pair.first<<"\t number of Reads is "<<cluster.getNumReads()<<endl;
-		  
+	    	  
 	      	  //cluster.printReads();
-		  cluster.setStartPositions(maxKmer);
+
+
+	      cluster.setStartPositions(maxKmer); 
+		 
+
 		  //cluster.printStartPositions();
 		 
-		  string contig=cluster.mergeReads(clusterKmerSize, 2, debuggingMatrix, iter->first);
+	      string contig=cluster.mergeReads(clusterKmerSize, 2, debuggingMatrix, iter->first);
+
+		 
 
 
-
-		  // string contig="AAAAAAA";
+													//string contig="AAAAAAA";
 
 		  if(contig.compare("0")!=0) //if a valid contig i.e. not equal to 0 then add it to the clusterBuffer
 		    {
 		      //cout<<contig<<endl;
-
+		      contigIDs.push_back(iter->first);
 		      contigBuffer.push_back(contig);
 		    }
 		  
@@ -2483,11 +2669,15 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
 		for(z=0; z<contigBuffer.size(); z++)
 		  {
-		    contigOut<<">"<<clusterNumber<<"\n";
+		    //contigOut<<">"<<clusterNumber<<"\n";
+		    
+		    contigOut<<">"<<contigIDs[z]<<"\n";	    
 		    contigOut<<contigBuffer[z]<<"\n";
 		    
 		    clusterNumber++;
 		  }
+
+		contigIDs.clear();
 		contigBuffer.clear();
 	      }
 	    
@@ -2498,8 +2688,10 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
 	}
 
+
       
 
+      
       
 #pragma omp critical(FLUSHING_CLUSTER) //flush last contigs left in buffer to a file
 	      {
@@ -2507,16 +2699,20 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
 		for(z=0; z<contigBuffer.size(); z++)
 		  {
-		    contigOut<<">"<<clusterNumber<<"\n";
+		    contigOut<<">"<<contigIDs[z]<<"\n";
 		    contigOut<<contigBuffer[z]<<"\n";
 		    
 		    clusterNumber++;
 		  }
+		
+		contigIDs.clear();
 		contigBuffer.clear();
 	      }
-
-
       
+
+
+
+	      
 	      
 	      //freeing up the memory that was dynamically allocated
 	      auto hashIter=clusters.begin();
@@ -2526,7 +2722,19 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 		{		  
 		  delete hashIter->second;
 		}
+
 	      
+	      
+	      /*
+	      hashIter=qualityStrings.begin();
+
+	      //deleting allocated memory
+      	      for(hashIter; hashIter!=clusters.end(); hashIter++)
+		{		  
+		  delete hashIter->second;
+		}
+	      */
+
       
       
 }

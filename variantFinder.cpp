@@ -57,7 +57,10 @@ int main(int argc, char *argv[] )
   allClusters.resize(30000);
   
   dense_hash_map<uint_fast64_t, uint_fast64_t, customHash> masterKey; //hash table contains the first middle and end kmer of the master read that defines a cluster
-  masterKey.set_empty_key(-1);
+  masterKey.set_empty_key(-20);
+
+
+
 
   /*
   vector<string> test;
@@ -84,8 +87,8 @@ int main(int argc, char *argv[] )
    //dense_hash_map<uint_fast64_t, int, customHash> uniqueKmers;
   //dense_hash_map<uint_fast64_t, ReadClusters, customHash> clusters;  
 
-  //clusters.set_empty_key(-1);
-  uniqueKmers.set_empty_key(-1);
+  //clusters.set_empty_key(-20);
+  uniqueKmers.set_empty_key(-20);
   uniqueKmers.set_deleted_key(-2);
   uniqueKmers.resize(100000000);
   //  controlKmers.resize(10000000000);
@@ -104,7 +107,9 @@ int main(int argc, char *argv[] )
     }
 
   //4 is the kmer count cutoff
-  readUniqueKmers(uniqueKmers, continueFlag, uniqueExpKmerCountFile, kmerSize, 8);
+   readUniqueKmers(uniqueKmers, continueFlag, uniqueExpKmerCountFile, kmerSize, 8);
+
+  
 
 
   /*   
@@ -137,6 +142,7 @@ int main(int argc, char *argv[] )
       //256 is number of files to split clusters into
     fileNames=getReads(uniqueKmers, 256, continueFlag, expSeqLib, kmerSize);
 
+   
 
     int currentClusterFilePublic=0; //index of the current cluster file that has not yet been assembled ctr will be shared by all threads
     int currentClusterFilePrivate=0; //index of the cluster file the thread is currently working on will be private
@@ -144,6 +150,8 @@ int main(int argc, char *argv[] )
     //test.push_back("/data/Temp/0.dat");
 
     cerr<<"Starting to assemble clusters "<<endl;
+
+    cerr<<"Number of files is "<<fileNames.size()<<endl;
 
     int thread_count=20;
     int tid;
@@ -182,7 +190,7 @@ int main(int argc, char *argv[] )
 	//4 is the cutoff number of reads 
 	//20 is the kmer size used to assemble the reads into a contig
 	
-	readInCluster(fileNames[currentClusterFilePrivate], 6, kmerSize, tid, contigOut, clusterID, debuggingMatrix);
+	readInCluster(fileNames[currentClusterFilePrivate], 6, 25, tid, contigOut, clusterID, debuggingMatrix);
 
 	  // readInCluster(fileNames[1], 4, 20, tid);
 	 

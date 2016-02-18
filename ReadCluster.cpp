@@ -1,5 +1,9 @@
 #include "ReadCluster.h"
 
+#include <bitset>
+
+
+
 using google::dense_hash_map;
 using google::sparse_hash_map;
 using std::cout;
@@ -52,10 +56,20 @@ void ReadCluster::addSeq(string &read)
 }
 
 
-void ReadCluster::addSequences(vector<string>& allReads)
+void ReadCluster::addSequences(std::unordered_map<string, string> *allReads)
 {
-  readSeqs=allReads;
-  
+
+  auto hashIter=allReads->begin();
+
+  for(hashIter; hashIter!=allReads->end(); hashIter++)
+    {
+      readSeqs.push_back(hashIter->first);
+      qualityStrings.push_back(hashIter->second);
+   }
+
+ 
+
+
   }
 
 void ReadCluster::printReads()
@@ -70,7 +84,8 @@ void ReadCluster::printReads()
       //cout<<readSeq[i]<<"\t"<<startPositions[i]<<endl;
 
       cout<<readSeqs[i]<<endl;
-
+      cout<<qualityStrings[i]<<endl;
+      cout<<endl;
     }
 
 
@@ -98,7 +113,7 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
   double Nctr, nucCtr, badColCtr;
  
   
-  
+  int qualityCutoff=15; //This is the base score quality cutoff if the base quality is less than this number than ignore that base
 
   //finding the maximum read size
   readSize=0;
@@ -115,10 +130,13 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
   
   vector<int> startMatrix(numReads, -1); //starting index in matrix of every assembled read
 
-
 			   
   //matrix to hold reads
   vector<vector<char>>matrix(numReads, vector<char>(numCol, 'N'));
+
+  //matrix to hold qualityScores
+  //vector<vector<long>>qualityMatrix(numReads, vector<long>(numCol, -1));
+
 
   //cerr<<"size of matrix is "<<matrix.size()<<" number of cols is "<<matrix[0].size()<<endl;
 
@@ -146,12 +164,44 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
 
       for(j=0; j<readSeqs[i].length(); j++)
 	{
-	      
-	      matrix[i][j+start]=readSeqs[i][ctr];
+	  int quality=int(qualityStrings[i][ctr])-33;
+	  //cerr<<"quality character is "<<qualityStrings[i][ctr]<<endl;
+
+	  /*
+	  if(clusterID==373437)
+	    {
+	      cerr<<quality<<" "<<qualityStrings[i][ctr];
+	    }
+	  */
+	  
+
+	  if(quality>=0 && quality<=qualityCutoff) 
+	    {
+	      ctr++;
+	      //cerr<<"inside this condition "<<endl;
+	      continue; //value in matrix will be left as an N i.e. that base will be ignored
+
+	    }else
+	    {
+	      matrix[i][j+start]=readSeqs[i][ctr]; //if a good quality base than use that bases nucleotide value	 
+	    }
+
 	      //cerr<<readSeqs[i][ctr];
 	      ctr++;
 	}
-      //cerr<<endl;
+
+
+      /*
+      if(clusterID==373437)
+	{
+	  cerr<<endl;
+	  cerr<<"end of processing the read "<<endl;
+
+	}
+      */
+
+
+//cerr<<endl;
     }
     
   
@@ -167,8 +217,8 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
   //algorithim: For a read that was not assembled look for a kmer in common with a read that was assembled 
   //line up the unassembled read with the read that is assembled based on the kmer in common
 
-  while(ctrUnassembled!=0)
-    {
+  //while(ctrUnassembled!=0)
+  //{
 
       ctrUnassembled=0;
       for(i=0; i!=startPositions.size(); ++i) //got through every read looking for unassembled reads
@@ -207,9 +257,62 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
 		      
 			  if(findIter!=kmerPositions[j].end()) //kmer is present in an assembled read
 			    {
+
+			      //get a read that is assembled to compare against
+			     
+			      int index=0;
+
+			      while(startPositions[index]<0 || index == j)
+				{
+				  index++;
+				}
+
+			      
+			      //check to make sure assembled read matches well with a neighboring read if it has to many mismatches do not use it
+			      int numMismatches=0;
+			      int sizeAligned=0;
+			      for(int y=0; y<readSeqs[j].size(); y++)
+				{
+				  if(matrix[j][startMatrix[j]+y]!='N' && matrix[index][startMatrix[j]+y]!='N') 
+				    {
+				      sizeAligned++;
+				      if(matrix[j][startMatrix[j]+y]!=matrix[index][startMatrix[j]+y])
+					{
+					  numMismatches++;
+					}
+
+				    }
+
+				}
+			      
+			      /*
+			       if(clusterID==228237)
+				{
+				  cerr<<"index of comparing read is "<<index<<"  index of assembled read is "<<j<<endl;
+				  cerr<<"number of mismatches is "<<numMismatches<<"  size Aligned is "<<sizeAligned<<endl;
+				  exit(0);
+				}
+			      */
+
+			      if((double(numMismatches)/double(sizeAligned))>0.1) //if more than 10% of read mismatches do not use that read as a template to aligne other reads
+				{
+				  continue;
+				}
+			      
+
 			      int start=(startMatrix[j]+kmerPositions[j][kmer])-kmerPositions[i][kmer]; //line up the start positions of the kmer in common between the assembled and unassembled read 
 			      int ctr=0;
-			  
+	
+			      /*
+			      if(clusterID==228237)
+				{
+				  cerr<<" assembled read is "<<j<<" index of unassembled read is "<<i<<endl;
+				  cerr<<"kmer in assembled Read is "<<bit2String(kmer, kmerSize)<<" string extracted from read is "<<readSeqs[j].substr(kmerPositions[j][kmer], kmerSize)<<endl;
+				  cerr<<"kmer in unassembled Read is "<<bit2String(kmer, kmerSize)<<" string extracted from unassembled read is "<<readSeqs[i].substr(kmerPositions[i][kmer], kmerSize)<<endl;
+
+				}
+			      */
+		  
 			      /*
 			      if(readSeqs[i].compare("CACCAATATGGCACATGTATACATATGTAACAAACCTGCACGTTGTGCACATGTACCCTAGAACTTAAAGTATAATGAAAAAAAAAAGCAATATAGATCGG")==0)
 				{
@@ -242,6 +345,8 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
 				  for(z=0; z<matrix.size(); z++)
 				    {
 				      matrix[z].insert(matrix[z].begin(), readSize*2, 'N'); //adding Ns at the beginning of the matrix adding 2X a read number of Ns
+				      //qualityMatrix[z].insert(qualityMatrix[z].begin(), readSize*2, -1); //adding Ns at the beginning of the quality matrix same as read matrix
+
 				      startMatrix[z]=startMatrix[z]+(2*readSize);
 				    }
 
@@ -251,16 +356,15 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
 			      if((start+readSize)>matrix[i].size()) //if read extends off the end of the matrix dynamically insert new columns at the end of the matrix 
 				{
 				  //cerr<<"reallocating at the end "<<endl;
-
-
-
 				 
-
 
 				  for(z=0; z<matrix.size(); z++)
 				    {
 				      matrix[z].insert(matrix[z].end(), readSize*2, 'N'); //adding Ns at the end of the matrix adding 2X a read number of Ns
+				      //qualityMatrix[z].insert(qualityMatrix[z].end(), readSize*2, -1); //adding Ns at the end of the quality matrix adding 2X a read number of Ns
+
 				    }
+				
 				}				
 
 			  
@@ -268,36 +372,22 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
 			      for(k=0; k<readSeqs[i].length(); k++)
 				{
 
-			      //cerr<<"k + start is "<<k+start<<" i is "<<i<<endl;
-
-			      //cerr<<"number of columns is "<<matrix[i].size()<<endl;
-			      //cerr<<"number of rows is "<<matrix.size()<<endl;
-
-			      //cerr<<"start is "<<start<<endl;
-			      
-				  /*			      
-			      if(i>=matrix.size() )
-				{
-				  cerr<<"####################bad indexes##############"<<endl;
-				  return "Bad Thing";
-				}
-			      
-			      if((k+start) >=matrix[i].size() || (k+start) < 0)
-				{
-			
-				  cerr<<"start of unassembled read is  "<<start<<" start of assembled read is "<<startMatrix[j]<<" start of kmer in assembled read is "<<kmerPositions[j][kmer]<<" start of kmer in unassembled read is "<<kmerPositions[i][kmer]<<" k + start is "<<(k+start)<<" matrix size is "<<matrix[i].size()<<endl;
-				  exit(0);
-				  return "Bad thing";
-				}
-				  */
-
-
+		
 
 			      //matrix[i][k+start]='A';
+				  int quality=int(qualityStrings[i][ctr])-33;
+				  if(quality>=0 && quality<=qualityCutoff) 
+				    {
+				      ctr++;
+				      continue; //value in matrix will be left as an N i.e. that base will be ignored
+				      
+				    }else
+				    {
+				      matrix[i][k+start]=readSeqs[i][ctr]; //if a good quality base than use that bases nucleotide value	 
+				    }
 
-				  matrix[i][k+start]=readSeqs[i][ctr];
-				  
-			      //cerr<<readSeqs[i][ctr];
+
+				
 			      
 				  ctr++;
 				}
@@ -320,7 +410,7 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
 
 	}
     
-    }
+      //}
 
 
   
@@ -417,7 +507,7 @@ flag=false;
 
 
       
-      if(nuc[indexMax] > cutoffMinNuc && ((nuc[indexMax]/nucCtr) > 0.75)) //filtering clusters
+      if(nuc[indexMax] >= cutoffMinNuc && ((nuc[indexMax]/nucCtr) > 0.75)) //filtering clusters
 	{
 	  flag=true;	  
 	  //cout<<nuc[indexMax]<<endl;
@@ -429,7 +519,6 @@ flag=false;
 	  //if have already started the contig but not confident in next base call then place an N. 
 	  if(flag)
 	    {
-	      
 	      combinedNuc += 'N';
 	      Nctr++;
 	    }
@@ -493,7 +582,7 @@ flag=false;
 	debugging<<endl;
       }
 
-    
+    debugging<<"cluster being assembled is  "<<clusterID<<endl;
     debugging<<"contig is "<<combinedNuc<<endl;
     debugging<<"percentage of bad columns is "<<badColCtr/combinedNuc.length()<<endl;
     debugging<<"finished printing out the matrix "<<endl;
@@ -615,8 +704,8 @@ uint_fast64_t ReadCluster::getKmers()
  //return(1);
 
  
- dense_hash_map<uint_fast64_t, long, customHash> kmerInReadCounts; //hash table contains a count of how many reads contain a given kmer key is the kmer value is the count 
- kmerInReadCounts.set_empty_key(-1);
+ //dense_hash_map<uint_fast64_t, long, customHash> kmerInReadCounts; //hash table contains a count of how many reads contain a given kmer key is the kmer value is the count 
+ //kmerInReadCounts.set_empty_key(-20);
  //kmerInReadCounts.resize(1000000);
 
  //return(1);
@@ -640,18 +729,17 @@ uint_fast64_t ReadCluster::getKmers()
 
 
     dense_hash_map<uint_fast64_t, long, customHash> readKmers; //hash table contains the kmers and their position in the read 
-    readKmers.set_empty_key(-1);
+    readKmers.set_empty_key(-20);
 
     dense_hash_map<uint_fast64_t, long, customHash> alreadyPresent; //hash table keeps track of kmers that have already been found earlier in the read key is the kmer the value is a flag set to 1 indicating the 
     //kmer is present in the read
-
-    alreadyPresent.set_empty_key(-1);
+    alreadyPresent.set_empty_key(-20);
 
 
     //     std::vector< google::dense_hash_map<uint_fast64_t, long, customHash> > kmerPositions;
 
-   	
-      positionCtr=0;
+    kmer=0;
+    positionCtr=0;
       //starting a new sequence
       for(i=readSeqs[j].length()-1; i>=0; i--)
 	{
@@ -724,10 +812,23 @@ uint_fast64_t ReadCluster::getKmers()
 		  continue;  
 		}
 
+	 
+	      /*
+#pragma omp critical(DEBUGGING_READKMERS)
+	      {
 	      
+		cout<<"kmer is  "<<kmer<<"\t kmer translated from bit string is "<<bit2String(kmer, 32)<<" bit representation is "<<std::bitset<64>(kmer)<<endl;
+	      
+		cout<<"hashed value for key is "<<SpookyHash::Hash64(&kmer, 8, 20)<<endl;
+	      }
+	      */
 	      
 	      readKmers[kmer]=i;
+	 
+	      //continue;
+	     
 	      
+     
 	      //lookup key if key not found will return iterator that points to end of hash table
 	      auto iter=alreadyPresent.find(kmer);
 	      
@@ -738,6 +839,7 @@ uint_fast64_t ReadCluster::getKmers()
 		 
 		  alreadyPresent[kmer]=1; //setting value to 1 indicating kmer has been found in this read
 		}
+
 	      
 	}
 
@@ -748,8 +850,9 @@ uint_fast64_t ReadCluster::getKmers()
   }
 
   
-  long max=-1;
+  signed long max=-1;
   uint_fast64_t maxKmer=0;
+
 
   //going through hash table which counts the number of times a kmer is found in the population of reads obtaining the kmer that occurs most often
   auto iterHash=kmerInReadCounts.begin();
@@ -794,13 +897,14 @@ bool comparePairs(const std::pair<uint_fast64_t, long>&i, const std::pair<uint_f
 
 
 
+/*
 std::pair<uint_fast64_t, long> ReadCluster::getPair(long index) //given an index return the pair kmer count pair corresponding to that index
 {
 
   return(kmerCounts[index]);
 
 }
-
+*/
 
 
 void ReadCluster::setKmerSize(int size)

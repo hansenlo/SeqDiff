@@ -1066,7 +1066,7 @@ sub getVar_MDstring($)
 
 
     my($cmd, $i, $line, $ref, $read, $operation, @data, $delFlag, $insFlag);
-    my($delStart, $delEnd, $insStart, $insEnd, $size, $prevPos);
+    my($delStart, $delEnd, $insStart, $insEnd, $size, $prevPos, $prevContig);
 
     $cmd="/data/bin/SamTSV/jvarkit/dist-1.128/sam2tsv -r /data/Genomes/human19/allChrhg19InOrder.fa  $samFile > temp.dat";
 
@@ -1092,100 +1092,134 @@ sub getVar_MDstring($)
 
     $prevPos=0;
 
+    my(@contig, $j, $lineCtr);
+    
+    $lineCtr=0;
+
+    $line=<FIN>; #reading in the header line
+    push @contig, [split(/\t/, $line)];
+    $prevContig="N";
+
+
     while($line=<FIN>)
     {
+	$lineCtr++;
 
 	chomp($line);
+
+	#if($#contig>0)
+	#{
+	$prevContig=$contig[$#contig][0]; #storing the contig before whatever contig is on the next line
+	#}
+
+	push @contig, [split(/\t/, $line)]; # get next line of file
+
+	if( ($contig[$#contig][0] ne $prevContig) ) #if on a different contig process the previous contig
+	{
+	    #print "on contig $contig[$#contig][0] line counter is $lineCtr prevContig is $prevContig\n";
+
+	    for($j=0; $j<=$#contig; $j++)
+	    {
+		if($j<($#contig * 0.05) or ($j > $#contig-($#contig * 0.05))  ) #do not call variants based on the edges of contigs much more susceptible to alignment artifacts. 
+		{
+		    next;
+
+		}
 	
-	$prevPos=$data[6];
-	@data=split(/\t/, $line);
+		$prevPos=$data[6];
+
+		@data=@{$contig[$j]};
+
+		
+		#@data=split(/\t/, $line);
 
 	#variant is a snp
-	if((uc($data[4]) ne uc($data[7])) && $data[8] eq "M")
-	{
-	    if(uc($data[4]) eq "N")
-	    {
-		next;
-	    }
-
-	    print SNP "$data[2]\t$data[6]\t$data[6]\t$data[4]\t$data[7]\n"; 
-
-	}
-	
-	if($data[8] eq "D")
-	{
-
-	    #first base in deleted region
-	    if($delFlag==0)
-	    {
-		$delFlag=1;
-		$delStart=$data[6]-1;
-		$delEnd=$data[6];
-
-	    }else
-	    {
-		#adding one to size of deleted region 
-		$delEnd+=1;
-	    }
-	
-
-
-	}
-
-	if($data[8] eq "I")
-	{
+		if((uc($data[4]) ne uc($data[7])) && $data[8] eq "M")
+		{
+		    if(uc($data[4]) eq "N")
+		    {
+			next;
+		    }
+	    
+		    print SNP "$data[2]\t$data[6]\t$data[6]\t$data[4]\t$data[7]\n"; 
+	    
+		}
+	    
+		if($data[8] eq "D")
+		{
 
 	    #first base in deleted region
-	    if($insFlag==0)
-	    {
-		$insFlag=1;
-		$insStart=$prevPos-1;
-		$insEnd=$insStart+1;
+		    if($delFlag==0)
+		    {
+			$delFlag=1;
+			$delStart=$data[6]-1;
+			$delEnd=$data[6];
 
-	    }else
-	    {
+		    }else
+		    {
 		#adding one to size of deleted region 
-		$insEnd+=1;
-	    }
-	
-	}
-
-
+			$delEnd+=1;
+		    }
 	
 
 
-	if($data[8] ne "I" && $data[8] ne "D")
-	{
+		}
+
+		if($data[8] eq "I")
+		{
+
+	    #first base in deleted region
+		    if($insFlag==0)
+		    {
+			$insFlag=1;
+			$insStart=$prevPos-1;
+			$insEnd=$insStart+1;
+
+		    }else
+		    {
+		#adding one to size of deleted region 
+			$insEnd+=1;
+		    }
+	
+		}
+
+	
+
+
+		if($data[8] ne "I" && $data[8] ne "D")
+		{
 	   
-	    if($delFlag==1)
-	    {
-		$size=($delEnd-$delStart)*-1;
-		$delStart--;
-		$delEnd--;
-		print Indels "$data[2]\t$delStart\t$delEnd\t$size\n";
+		    if($delFlag==1)
+		    {
+			$size=($delEnd-$delStart)*-1;
+			$delStart--;
+			$delEnd--;
+			print Indels "$data[2]\t$delStart\t$delEnd\t$size\n";
 		
-		$delFlag=0;
-	    }
+			$delFlag=0;
+		    }
  
 
-	    if($insFlag==1)
-	    {
-		$size=($insEnd-$insStart)*1;
-		print Indels "$data[2]\t$insStart\t$insEnd\t$size\n";
+		    if($insFlag==1)
+		    {
+			$size=($insEnd-$insStart)*1;
+			print Indels "$data[2]\t$insStart\t$insEnd\t$size\n";
 	    
-		$insFlag=0;
+			$insFlag=0;
 
-	    }
+		    }
 
 
 	     
+		}
+	 
+	    }
+
+	    @contig=(); #clear the contig array 
+	    push @contig, [split(/\t/, $line)]; #add the current line which is the first base of the contig back in
 	}
 
-
-	 
     }
-
-
 
     
 

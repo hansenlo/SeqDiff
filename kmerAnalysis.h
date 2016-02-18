@@ -24,7 +24,7 @@ void printSingleCluster( google::dense_hash_map<uint_fast64_t, long, customHash>
 
 	     	      
 //function to print out the clusters of reads and all unique reads
-void printClusters(std::vector< std::vector<std::string> > &clusterBuffer, google::dense_hash_map<uint_fast64_t, int, customHash> &clusterFiles, std::vector< std::string > &uniqueReadsBuffer, std::vector<int> &qualityBuffer, std::ofstream &uniqueOut, std::vector<std::shared_ptr<std::ofstream> > &files, int tid);
+void printClusters(std::vector< std::vector<std::string> > &clusterBuffer, google::dense_hash_map<uint_fast64_t, int, customHash> &clusterFiles, std::vector< std::string > &uniqueReadsBuffer, std::vector<int> &qualityBuffer, std::vector< std::string > &qualityStringBuffer, std::ofstream &uniqueOut, std::vector<std::shared_ptr<std::ofstream> > &files, int tid);
 
 void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work 
 		    google::dense_hash_map<uint_fast64_t, long, customHash> &clusterKmers, //hash table key is kmer value is the cluster that kmer belongs to
