@@ -30,7 +30,7 @@ eval $CMD
 
 mv temp.bed SnpCalls_NistRegions.bed
 
-intersectBed -a SnpCalls_NistRegions.bed -b /data3/GenomeInABottle/SNP_Only.recode.vcf > SnpCalls_TruePositives.bed #find the snps that intersect
+intersectBed -u -a SnpCalls_NistRegions.bed -b /data3/GenomeInABottle/SNP_Only.recode.vcf > SnpCalls_TruePositives.bed #find the snps that intersect
 
 intersectBed -v -a SnpCalls_NistRegions.bed -b /data3/GenomeInABottle/SNP_Only.recode.vcf > SnpCalls_FalsePositives.bed #find the snps that do not intersect
 
@@ -39,7 +39,7 @@ intersectBed -v -b SnpCalls_NistRegions.bed -a /data3/GenomeInABottle/SNP_Only.r
 
 sed -i -e 's/^/chr/' SnpCalls_FalsePositives.bed #add chr back to each line because db snp is in that format
 
-intersectBed -a SnpCalls_FalsePositives.bed -b /home/hansenlo/SeqDiff/Annotations/dbSNP_138_UCSC.bed > SnpCalls_FalsePositives_intersectDBSnp.bed #find the snps that intersect
+intersectBed -u -a SnpCalls_FalsePositives.bed -b /home/hansenlo/SeqDiff/Annotations/dbSNP_138_UCSC.bed > SnpCalls_FalsePositives_intersectDBSnp.bed #find the snps that intersect
 
 
 intersectBed -v -a SnpCalls_FalsePositives.bed -b /home/hansenlo/SeqDiff/Annotations/dbSNP_138_UCSC.bed > SnpCalls_FalsePositives_DoNot_intersectDBSnp.bed #find the snps that are not found in DBsnp
@@ -65,7 +65,7 @@ mv temp.bed indelCalls_NistRegions.bed
 
 
 
-intersectBed -a indelCalls_NistRegions.bed -b /data3/GenomeInABottle/chr21_indelsOnly.recode.bed > indelCalls_TruePositives.bed #find the snps that intersect
+intersectBed -u -a indelCalls_NistRegions.bed -b /data3/GenomeInABottle/chr21_indelsOnly.recode.bed > indelCalls_TruePositives.bed #find the snps that intersect
 
 intersectBed -v -a indelCalls_NistRegions.bed -b /data3/GenomeInABottle/chr21_indelsOnly.recode.bed > indelCalls_FalsePositives.bed #find the snps that do not intersect
 

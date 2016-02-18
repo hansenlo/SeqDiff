@@ -1,0 +1,1 @@
+ time perl runJob_BitString.pl /data3/GenomeInABottle/chr21_notAligned.fastq /data3/GenomeInABottle/chr21_notAligned_refSubtracted_humanReadable_notQualityFiltered.dat

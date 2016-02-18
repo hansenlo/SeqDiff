@@ -1451,7 +1451,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		    //}
 
 		    
-
+		    /*
 		    //check the base that made it unique check to see if it is a good quality base
 		    quality=int(workNodePtr->qualityScores[j][i])-33;
 		    
@@ -1459,9 +1459,9 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		      {
 			goodQuality=false;
 		      }
+		    */
 
-
-		    /*
+		    
 		    //check every base of the unique kmer if any of them have poor quality mark
 		    //the read as a poor quality read
 		    long limit=(i+kmerSize);
@@ -1481,7 +1481,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 			
 		    }
-		    */
+		    
 
 
 		    if(fastq)
@@ -2589,7 +2589,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	  //cout<<ratio<<endl;
 
 	  
-	  if(ratio< 0.3) //if the number of reads that contains good quality kmers is less than 30% of the reads in the cluster than throw away cluster
+	  if(ratio< 0.2) //if the number of reads that contains good quality kmers is less than 30% of the reads in the cluster than throw away cluster
 	    {
 	      continue;
 	    }

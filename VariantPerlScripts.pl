@@ -1120,7 +1120,7 @@ sub getVar_MDstring($)
 
 	    for($j=0; $j<=$#contig; $j++)
 	    {
-		if($j<($#contig * 0.05) or ($j > $#contig-($#contig * 0.05))  ) #do not call variants based on the edges of contigs much more susceptible to alignment artifacts. 
+		if($j<($#contig * 0.1) or ($j > $#contig-($#contig * 0.1))  ) #do not call variants based on the edges of contigs much more susceptible to alignment artifacts. 
 		{
 		    next;
 

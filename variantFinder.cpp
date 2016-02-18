@@ -107,7 +107,7 @@ int main(int argc, char *argv[] )
     }
 
   //4 is the kmer count cutoff
-   readUniqueKmers(uniqueKmers, continueFlag, uniqueExpKmerCountFile, kmerSize, 8);
+  readUniqueKmers(uniqueKmers, continueFlag, uniqueExpKmerCountFile, kmerSize, 8);
 
   
 

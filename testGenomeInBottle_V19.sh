@@ -33,12 +33,12 @@ eval $CMD
 
 mv temp.bed SnpCalls_NistRegions.bed
 
-intersectBed -a SnpCalls_NistRegions.bed -b /data3/GenomeInABottle/allSNPs_only_NIST_v2.19.recode.vcf > SnpCalls_TruePositives.bed #find the snps that intersect
+intersectBed -u -a SnpCalls_NistRegions.bed -b /data3/GenomeInABottle/allSNPs_only_NIST_v2.19.recode.vcf > SnpCalls_TruePositives.bed #find the snps that intersect
 
 intersectBed -v -a SnpCalls_NistRegions.bed -b /data3/GenomeInABottle/allSNPs_only_NIST_v2.19.recode.vcf > SnpCalls_FalsePositives.bed #find the snps that do not intersect
 
 
-intersectBed -v -b SnpCalls_NistRegions.bed -a /data3/GenomeInABottle/allSNPs_only_NIST_v2.19.recode.vcf > Snp_NistCalls_FalseNegatives.vcf #find the snps that intersect
+intersectBed -v -b SnpCalls_NistRegions.bed -a /data3/GenomeInABottle/allSNPs_only_NIST_v2.19.recode.vcf > SnpCalls_NistCalls_FalseNegatives.vcf #find the snps that intersect
 
 sed -i -e 's/^/chr/' SnpCalls_FalsePositives.bed #add chr back to each line because db snp is in that format
 
@@ -67,7 +67,7 @@ eval $CMD
 mv temp.bed indelCalls_NistRegions.bed
 
 
-intersectBed -a indelCalls_NistRegions.bed -b /data3/GenomeInABottle/allIndels_only_NIST_v2.19.recode.vcf > indelCalls_TruePositives.bed #find the snps that intersect
+intersectBed -u -a indelCalls_NistRegions.bed -b /data3/GenomeInABottle/allIndels_only_NIST_v2.19.recode.vcf > indelCalls_TruePositives.bed #find the snps that intersect
 
 intersectBed -v -a indelCalls_NistRegions.bed -b /data3/GenomeInABottle/allIndels_only_NIST_v2.19.recode.vcf > indelCalls_FalsePositives.bed #find the snps that do not intersect
 

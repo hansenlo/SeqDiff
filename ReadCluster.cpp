@@ -113,7 +113,7 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
   double Nctr, nucCtr, badColCtr;
  
   
-  int qualityCutoff=15; //This is the base score quality cutoff if the base quality is less than this number than ignore that base
+  int qualityCutoff=20; //This is the base score quality cutoff if the base quality is less than this number than ignore that base
 
   //finding the maximum read size
   readSize=0;
