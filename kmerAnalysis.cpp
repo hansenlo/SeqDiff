@@ -18,7 +18,7 @@ using std::to_string;
 using std::list;
 using std::make_shared;
 using std::unordered_map;
-
+using std::bitset;
 
 
 inline void countKmers(sparse_hash_map<uint_fast64_t, int, customHash> &controlKmers, char nextLineFlag, string inputFile, int kmerSize)
@@ -373,6 +373,11 @@ void countUniqueKmers(sparse_hash_map<uint_fast64_t, int, customHash>  &controlK
 
   uint_fast64_t key, positionCtr, AbitString, CbitString, GbitString, TbitString; 
 
+  int bitWord=16;
+
+  bitset<bitSetSize>clearbitWord(pow(2,bitWord)-1);
+
+
   //sparse_hash_map<uint_fast64_t, int, customHash> allKmers;
   //dense_hash_map<uint_fast64_t, int, customHash> denseKmers;
 
@@ -434,9 +439,7 @@ void countUniqueKmers(sparse_hash_map<uint_fast64_t, int, customHash>  &controlK
 
 
   //building the look up table to reverse nucleotide bit strings
-   int bitWord=16;
-   std::vector<uint_fast32_t> bitTable(pow(2,bitWord));
-
+   std::vector< bitset<bitSetSize> > bitTable(pow(2,bitWord));
    createBitRevTable(bitWord, bitTable);
 
 
@@ -608,13 +611,18 @@ void countUniqueKmers(sparse_hash_map<uint_fast64_t, int, customHash>  &controlK
 	      //revKey=revKey&revSubString;
 
 	      //16 bit reverse complement 
+	      //	      revComplementBitString(reversedKey, key, clearbitWord, bitTable, bitWord, kmerSize);
+
+	      
+
+	      /*
 	      reversedKey = (bitTable[key & 0xffff] << 48) | 
 		(bitTable[(key >> 16) & 0xffff] << 32) | 
 		(bitTable[(key >> 32) & 0xffff] << 16) |
 		(bitTable[(key >> 48) & 0xffff]);  
 
 	      reversedKey=reversedKey>>(64-kmerSize*2);
-
+	      */
 	      
 	      //dynamic_bitset<> bitRepRev(64, reversedKey);
 	      //cout<<bitRepRev<<endl;
@@ -773,7 +781,7 @@ void countUniqueKmers(sparse_hash_map<uint_fast64_t, int, customHash>  &controlK
   seqFile.close();
 }
 
-void readUniqueKmers(dense_hash_map<uint_fast64_t, int, customHash>  &uniqueKmers,  char nextLineFlag, string inputFile, int kmerSize, int ctrCutoff)
+void readUniqueKmers(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqueKmers,  char nextLineFlag, string inputFile, int kmerSize, int ctrCutoff)
 {
   ifstream seqFile;
   string line, qualityScores, temp, foo, word, kmer;
@@ -781,14 +789,13 @@ void readUniqueKmers(dense_hash_map<uint_fast64_t, int, customHash>  &uniqueKmer
   int ctr, i, revControlValue, controlValue, quality, kmerCtr;
   long totalCtr, limit;
   bool fastq, flag, secondTime, usedRead, qualityReadIn;
-  uint_fast64_t index, reversedKey, firstKey, secondKey;
+  uint_fast64_t index, positionCtr;
 
   string validChar = "ACGTacgtN";
   string DNAchar="ACGTacgt";
 
-  uint_fast64_t key, positionCtr, AbitString, CbitString, GbitString, TbitString; 
-
-  
+  bitset<bitSetSize> key, AbitString, CbitString, GbitString, TbitString, reversedKey, firstKey, secondKey;
+    
   vector<string> splitLine;
 
   //sparse_hash_map<uint_fast64_t, int, customHash> allKmers;
@@ -799,26 +806,17 @@ void readUniqueKmers(dense_hash_map<uint_fast64_t, int, customHash>  &uniqueKmer
 
   //code to place binary represenation into right side of bit string. 
   //00 bitstring represents A
-  AbitString=0*pow(2, 64-(2*kmerSize))+0*pow(2, 64-((2*kmerSize)-1));
-
-    //11 bitstring represents T place into left side of bit string
-  //TbitString=1*pow(2, 64-(2*kmerSize))+1*pow(2, 64-((2*kmerSize)-1));
-
-  //place into right side of bitstring
-  TbitString=1*pow(2, (2*kmerSize)-2)+1*pow(2, ((2*kmerSize)-1));
  
-    //10 bitstring represents G places into left side of bit string
-  //GbitString=0*pow(2, 64-(2*kmerSize))+1*pow(2, 64-((2*kmerSize)-1));
-  
-  //places into right side of bit string
- GbitString=0*pow(2, (2*kmerSize))+1*pow(2, ((2*kmerSize)-1));
 
+  //11 bitstring represents T place into right side of bit string
+  TbitString.set((2*kmerSize)-1);
+  TbitString.set((2*kmerSize)-2);
+ 
+  //10 bitstring represents G places into right side of bit string
+  GbitString.set((2*kmerSize)-1);
 
-  //01 bitstring represents C places into left side of bitstring
-  //CbitString=1*pow(2, 64-(2*kmerSize))+0*pow(2, 64-((2*kmerSize)-1));
-
- //place into right side of bitstring
- CbitString=1*pow(2, (2*kmerSize)-2)+0*pow(2, ((2*kmerSize)));
+  //01 bitstring represents C places into right side
+  CbitString.set((2*kmerSize)-2);
 
 
  continueFlag=nextLineFlag;
@@ -842,28 +840,26 @@ void readUniqueKmers(dense_hash_map<uint_fast64_t, int, customHash>  &uniqueKmer
       exit(EXIT_FAILURE);
     }
  
-
+  /*
   //building the look up table to reverse nucleotide bit strings
-   int bitWord=16;
-   std::vector<uint_fast32_t> bitTable(pow(2,bitWord));
-
-   createBitRevTable(bitWord, bitTable);
-
+  int bitWord=16;
+  std::vector< bitset<bitSetSize> > bitTable(pow(2,bitWord));
+  bitset<bitSetSize>clearbitWord(pow(2,bitWord)-1);
+  createBitRevTable(bitWord, bitTable);
+  */
 
    //revKey=0;
-  key=0;
-  positionCtr=0;
-  totalCtr=0;
-  flag=true;
-  ctr=3;
+   key.reset();
+   positionCtr=0;
+   totalCtr=0;
+   flag=true;
+   ctr=3;
   //arrayIndex=0;
-  flag=false;
-  firstKey=0;
-  secondKey=0;
-  while(seqFile.good())  
-  {
-      totalCtr++;
-      ctr++;
+   flag=false;
+   while(seqFile.good())  
+     {
+       totalCtr++;
+       ctr++;
       //read in every line of the sequence file
       //getline(seqFile, line);
 
@@ -877,18 +873,18 @@ void readUniqueKmers(dense_hash_map<uint_fast64_t, int, customHash>  &uniqueKmer
       //}
   
       
-      getline(seqFile, line);
+       getline(seqFile, line);
    
       
       //object will convert string to a stream so can use things like getline on it
-      istringstream iss(line);
+       istringstream iss(line);
 
       //can parse string this way because words seperated by a space
-      iss>>kmer>>word;
+       iss>>kmer>>word;
 
 
       //convert from string into and integer
-      kmerCtr=stoi(word);
+       kmerCtr=stoi(word);
 
       //cout<<"kmer is "<<kmer<<" count is  "<<kmerCtr<<endl;
 
@@ -938,8 +934,8 @@ void readUniqueKmers(dense_hash_map<uint_fast64_t, int, customHash>  &uniqueKmer
 	  if(DNAchar.find(kmer[i]) == std::string::npos) {
 		
 	    //revKey=0;
-		  key=0;
-		  positionCtr=0;
+	    key.reset();
+	    positionCtr=0;
 		  //flag=true;
 		  continue;
 	      }else
@@ -950,11 +946,11 @@ void readUniqueKmers(dense_hash_map<uint_fast64_t, int, customHash>  &uniqueKmer
 		  switch(kmer[i])
 		    {
 		    case 'A' :
-		      key=key|0;
+		      key=key|AbitString;
 		      break;
 		    
 		    case 'a' :
-		      key=key|0;
+		      key=key|AbitString;
 		      break;
 		   
 		    case 'T' :
@@ -1016,8 +1012,12 @@ void readUniqueKmers(dense_hash_map<uint_fast64_t, int, customHash>  &uniqueKmer
 	      //cout<<" index is  "<<i<<endl;
 	      //cout<<bitRep2<<endl;
 
-	     
-	      uniqueKmers[key]=kmerCtr;
+	      
+	      //revComplementBitString(reversedKey, key, clearbitWord, bitTable, bitWord, kmerSize);
+
+	      //cout<<"key is "<<key<<endl;
+
+	      uniqueKmers[key]=kmerCtr; //NEED TO UNCOMMENT IN ORDER TO WORK
 	 
 
 		 
@@ -1049,7 +1049,7 @@ void printSingleCluster( dense_hash_map<uint_fast64_t, long, customHash> &cluste
 
       if(iter->second==clusterID)
 	{
-	  cout<<clusterID<<"\t"<<bit2String(iter->first, kmerSize)<<endl;
+	  //cout<<clusterID<<"\t"<<bit2String(iter->first, kmerSize)<<endl; //Uncomment this in order for it to work
 	}
 
 
@@ -1071,7 +1071,7 @@ void printSingleCluster( dense_hash_map<uint_fast64_t, long, customHash> &cluste
 
 	     	      
 //function to print out the clusters of reads and all unique reads
-void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_fast64_t, int, customHash> &clusterFiles, vector< string > &uniqueReadsBuffer, std::vector<int> &qualityBuffer, std::vector<string> &qualityStringBuffer, ofstream &uniqueOut, vector<std::shared_ptr<ofstream> > &files, int tid)
+void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_fast32_t, int, stdHash> &clusterFiles, vector< string > &uniqueReadsBuffer, std::vector<int> &qualityBuffer, std::vector<string> &qualityStringBuffer, ofstream &uniqueOut, vector<std::shared_ptr<ofstream> > &files, int tid)
 {
   long j;
 
@@ -1129,12 +1129,11 @@ void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_
 
 
 
-
 void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work 
-		    dense_hash_map<uint_fast64_t, long, customHash> &clusterKmers, //hash table key is kmer value is the cluster that kmer belongs to
-		    dense_hash_map<uint_fast64_t, int, customHash> &clusterFiles,  //hash table key is a cluster id value is the index into the vector of output file names
+		    dense_hash_map<std::bitset<bitSetSize>, uint_fast32_t, stdHash> &clusterKmers, //hash table key is kmer value is the cluster that kmer belongs to
+		    dense_hash_map<uint_fast32_t, int, stdHash> &clusterFiles,  //hash table key is a cluster id value is the index into the vector of output file names
 		    vector<std::shared_ptr<ofstream> > &files, //set of opened file handlers that clusters will be written to
-		    dense_hash_map<uint_fast64_t, int, customHash> &uniqueKmers, //hash table key is a kmer that is unqiue to the exp read library value is the number of times kmer occurs in experiment read library
+		    dense_hash_map<std::bitset<bitSetSize>, int, stdHash>  &uniqueKmers, //hash table key is a kmer that is unqiue to the exp read library value is the number of times kmer occurs in experiment read library
 		    ofstream &uniqueOut, //ofstream object file handler contains location of output file for all unique reads
 		    int kmerSize, //kmer size
 		    int numFiles, //number of files to print clusters to
@@ -1149,7 +1148,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
   long ctr, i, revControlValue, controlValue, kmerCounter, j, NCtr, k;
   long totalCtr, startFirstKmer, startSecondKmer, lineCtr, limit;
   bool fastq, flag, secondTime, usedRead, presentCluster, foundCluster, isUnique;
-  uint_fast64_t index, reversedKey, firstKey, secondKey, tempKey, posKey, negKey, first, middle, end, currentUniqueKey;
+  uint_fast64_t index, tempKey, posKey, negKey, first, middle, end, positionCtr;
   uint_fast64_t lastKey, clusterIndex, randomFileIndex, tempValue;
   int posMaxInter, posSecondBestInter, negMaxInter, negSecondBestInter, quality, firstKeyIndex, currentUniqueKeyIndex, poorQualityCtr;
   long distanceFirstKey; //the distance in basepairs from the current key only add the first key to the cluster if the distance is less than kmer size from the first key
@@ -1161,7 +1160,11 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
   string validChar = "ACGTacgtN";
   string DNAchar="ACGTacgt";
 
-  uint_fast64_t key, positionCtr, AbitString, CbitString, GbitString, TbitString; 
+  //uint_fast64_t key, positionCtr, AbitString, CbitString, GbitString, TbitString; 
+
+
+  bitset<bitSetSize> key, AbitString, CbitString, GbitString, TbitString, reversedKey, firstKey, secondKey, currentUniqueKey;
+  
 
 
   //creating a vector of vectors to hold the set of reads that belong to a cluster
@@ -1185,36 +1188,25 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
  
   //building the look up table to reverse nucleotide bit strings
+   
    int bitWord=16;
-   std::vector<uint_fast32_t> bitTable(pow(2,bitWord));
-
+   std::vector< bitset<bitSetSize> > bitTable(pow(2,bitWord));
+   bitset<bitSetSize>clearbitWord(pow(2,bitWord)-1);
    createBitRevTable(bitWord, bitTable);
 
 
-
-
-  //code to place binary represenation into right side of bit string. 
+//code to place binary represenation into right side of bit string. 
   //00 bitstring represents A
-  AbitString=0*pow(2, 64-(2*kmerSize))+0*pow(2, 64-((2*kmerSize)-1));
-
-    //11 bitstring represents T place into left side of bit string
-  //TbitString=1*pow(2, 64-(2*kmerSize))+1*pow(2, 64-((2*kmerSize)-1));
-
-  //place into right side of bitstring
-  TbitString=1*pow(2, (2*kmerSize)-2)+1*pow(2, ((2*kmerSize)-1));
  
-    //10 bitstring represents G places into left side of bit string
-  //GbitString=0*pow(2, 64-(2*kmerSize))+1*pow(2, 64-((2*kmerSize)-1));
-  
-  //places into right side of bit string
- GbitString=0*pow(2, (2*kmerSize))+1*pow(2, ((2*kmerSize)-1));
+  //11 bitstring represents T place into right side of bit string
+  TbitString.set((2*kmerSize)-1);
+  TbitString.set((2*kmerSize)-2);
+ 
+  //10 bitstring represents G places into right side of bit string
+  GbitString.set((2*kmerSize)-1);
 
-
-  //01 bitstring represents C places into left side of bitstring
-  //CbitString=1*pow(2, 64-(2*kmerSize))+0*pow(2, 64-((2*kmerSize)-1));
-
- //place into right side of bitstring
- CbitString=1*pow(2, (2*kmerSize)-2)+0*pow(2, ((2*kmerSize)));
+  //01 bitstring represents C places into right side
+  CbitString.set((2*kmerSize)-2);
 
 
 
@@ -1228,11 +1220,11 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 
    //revKey=0;
-  key=0;
+  key.reset();
   positionCtr=0;
   totalCtr=0;
   ctr=3;
-  firstKey=0;
+  firstKey.reset();
   fastq=true;
 
 
@@ -1249,14 +1241,14 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
       if(continueFlag=='0')
 	{
 	  //revKey=0;
-	  key=0;
+	  key.reset();
 	  positionCtr=0;
 	  flag=true;
 	}
       
       secondTime=false;
       usedRead=false;
-      firstKey=0; 
+      firstKey.reset(); 
       secondKey=0;
       kmerCounter=0;
       NCtr=0;
@@ -1282,7 +1274,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 	  if(DNAchar.find(workNodePtr->chunk[j][i]) == std::string::npos) {
 		
 	    //revKey=0;
-	    key=0;
+	    key.reset();
 	    positionCtr=0;
 	    //NCtr+=1; //Counts number of Ns in line
 		  //flag=true;
@@ -1295,11 +1287,11 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 	      switch(workNodePtr->chunk[j][i])
 		{
 		case 'A' :
-		  key=key|0;
+		  key=key|AbitString;
 		  break;
 		  
 		case 'a' :
-		  key=key|0;
+		  key=key|AbitString;
 		  break;
 		  
 		case 'T' :
@@ -1350,6 +1342,10 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		}
 
 
+	      //reverse complement the key
+	      revComplementBitString(reversedKey, key, clearbitWord, bitTable, bitWord, kmerSize);
+
+	      /*
 	      //16 bit reverse complement 
 	      reversedKey = (bitTable[key & 0xffff] << 48) | 
 		(bitTable[(key >> 16) & 0xffff] << 32) | 
@@ -1357,7 +1353,9 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		(bitTable[(key >> 48) & 0xffff]);  
 
 	      reversedKey=reversedKey>>(64-kmerSize*2);
+	      */
 
+	      
 	      //#pragma omp critical(PRINT_REVERSEDKEY)
 		//{
 	      //cout<<"reversedKey is "<<reversedKey<<"\t key translated from bit string is "<<bit2String(reversedKey, kmerSize)<<" bit representation is "<<std::bitset<64>(reversedKey)<<endl;
@@ -1451,26 +1449,27 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		    //}
 
 		    
-		    /*
+		    
 		    //check the base that made it unique check to see if it is a good quality base
 		    quality=int(workNodePtr->qualityScores[j][i])-33;
 		    
 		    if(quality<=10)
 		      {
 			goodQuality=false;
+			//break;
 		      }
-		    */
-
 		    
+
+		    /*		    
 		    //check every base of the unique kmer if any of them have poor quality mark
 		    //the read as a poor quality read
 		    long limit=(i+kmerSize);
 		    for(k=i; k<limit; k++)
-		    {
+		      {
 
 		      //checking the quality of the base for the new kmer  
 		      //assuming quality is sanger format
-		      quality=int(workNodePtr->qualityScores[j][k])-33;
+			quality=int(workNodePtr->qualityScores[j][k])-33;
 		      
 			if(quality<=10)
 			  {
@@ -1480,9 +1479,9 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			  }
 
 			
-		    }
+		      }
+		    */
 		    
-
 
 		    if(fastq)
 		      {
@@ -1591,6 +1590,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			    qualityBuffer.push_back(0);
 			  }
 
+			  //qualityBuffer.push_back(1);
 
 
 			  if(kmerCounter==1)
@@ -1719,7 +1719,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 
 
-
+			  /*
 
 			  //reverse complement the first key in the new read and add it to the cluster assuming it does not already exist
 			  reversedKey = (bitTable[firstKey & 0xffff] << 48) | 
@@ -1729,6 +1729,9 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 			  reversedKey=reversedKey>>(64-kmerSize*2);
 			  
+			  */
+
+
 			  if(kmerCounter>1)
 			    {
 			      //if(clusterKmers.count(reversedKey)==0)
@@ -1967,7 +1970,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 //void getReads(sparse_hash_map<uint_fast64_t, int, customHash> &uniqueKmers, sparse_hash_map<uint_fast64_t, ReadCluster *, customHash> &readClusters, char nextLineFlag, string inputFile, int kmerSize, dense_hash_map<uint_fast64_t, uint_fast64_t, customHash> &masterKey )
 
-vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKmers, int numFiles, char nextLineFlag, string inputFile, int kmerSize)
+vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqueKmers, int numFiles, char nextLineFlag, string inputFile, int kmerSize)
 {
   ifstream seqFile;
   string line, header, tempLine, qualityScore;
@@ -1995,12 +1998,16 @@ vector<string> getReads(dense_hash_map<uint_fast64_t, int, customHash> &uniqueKm
 
  
 
-  dense_hash_map<uint_fast64_t, int, customHash> clusterFiles; //hash table key is a cluster id value is the index into the vector of output file names
+  dense_hash_map<std::bitset<bitSetSize>, uint_fast32_t, stdHash> clusterKmers; //hash table key is kmer value is the cluster that kmer belongs to
+  dense_hash_map<uint_fast32_t, int, stdHash> clusterFiles; //hash table key is a cluster id value is the index into the vector of output file names
+
+
+  //dense_hash_map<uint_fast64_t, int, customHash> clusterFiles; //hash table key is a cluster id value is the index into the vector of output file names
   clusterFiles.set_empty_key(-20);
   clusterFiles.resize(10000000);
 
 //hash table to hold the kmers assocated with each cluster
-  dense_hash_map<uint_fast64_t, long, customHash> clusterKmers(10000000); //hash table key is kmer value is the cluster that kmer belongs to
+  //dense_hash_map<uint_fast64_t, long, customHash> clusterKmers(10000000); //hash table key is kmer value is the cluster that kmer belongs to
   clusterKmers.resize(100000000);
 //dense_hash_map<uint_fast64_t, long, customHash> clusterKmers; //hash table key is kmer value is the cluster that kmer belongs to
   clusterKmers.set_empty_key(-20);
@@ -2449,7 +2456,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
   vector<string> contigBuffer; //holds the set of assembled contigs will write them to a file when they get to large
   contigBuffer.reserve(maxBufferSize);
 
-  vector<uint_fast64_t> contigIDs; //holds the set of contigIDs for the assembled clusters will write them out with the contigs 
+  vector<string> contigIDs; //holds the set of contigIDs for the assembled clusters will write them out with the contigs 
   contigBuffer.reserve(maxBufferSize);
 
   
@@ -2589,7 +2596,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	  //cout<<ratio<<endl;
 
 	  
-	  if(ratio< 0.2) //if the number of reads that contains good quality kmers is less than 30% of the reads in the cluster than throw away cluster
+	  if(ratio< 0.3) //if the number of reads that contains good quality kmers is less than 30% of the reads in the cluster than throw away cluster
 	    {
 	      continue;
 	    }
@@ -2603,7 +2610,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	  //iter->second->erase(last, iter->second->end());
 	  
 	  //number of reads in cluster cutoff
-	  if(iter->second->size()> cutoffClusterSize)
+	  if(iter->second->size()>=cutoffClusterSize)
 	    {
 
 
@@ -2624,7 +2631,6 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	      
 
 
-
 	      // uint_fast64_t maxKmer=1;
 
 	    	  
@@ -2640,15 +2646,14 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
 		 
 
-
 													//string contig="AAAAAAA";
 
-		  if(contig.compare("0")!=0) //if a valid contig i.e. not equal to 0 then add it to the clusterBuffer
-		    {
+	      if(contig.compare("0")!=0) //if a valid contig i.e. not equal to 0 then add it to the clusterBuffer
+		{
 		      //cout<<contig<<endl;
-		      contigIDs.push_back(iter->first);
-		      contigBuffer.push_back(contig);
-		    }
+		  contigIDs.push_back(to_string(iter->first)+"_"+to_string(iter->second->size()));
+		  contigBuffer.push_back(contig);
+		}
 		  
 		  //cout<<bit2String(pair.first, clusterKmerSize)<<endl;
 		  

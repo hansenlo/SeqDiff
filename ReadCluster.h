@@ -3,11 +3,11 @@
 
 #include<sparsehash/sparse_hash_map>
 #include<sparsehash/dense_hash_map>
-//#include<bitset>
+#include<bitset>
 #include<fstream>
 #include<string>
 #include<stdlib.h>
-#include<boost/dynamic_bitset.hpp>
+//#include<boost/dynamic_bitset.hpp>
 //#include<algorithm>
 //#include <boost/algorithm/string.hpp>
 //#include<math.h>
@@ -22,6 +22,8 @@
 #include <iostream>
 #include<list>
 #include <unordered_map>
+#include <functional>
+
 
 #include "utilities.h"
 
@@ -68,6 +70,8 @@ public:
   void setStartPositions(uint_fast64_t kmer); //given a kmer set the start position of that kmer for each read that contains the given kmer usually only called once for the kmer that occurs most often among the set of reads
   void printStartPositions();
   //void setUsedReadsFalse(); //will set the vector of usedReads all to false using the member variable clusterKmerSize if clusterKmerSize is not defined will throw an error
+  
+  uint_fast64_t numberDiff(std::vector<std::vector<char>> &alignmentMatrix, int row1, int row2, int start1, int start2, int &sizeAligned); //Given the alignment matrix of reads and the row index and start positition of the 2 reads calculate percent difference of the 2 reads for the aligned regions sizeAligned is the number of aligned bases between the 2 reads the aligned bases may not necassarily match
 
 };
 

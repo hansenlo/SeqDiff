@@ -42,6 +42,17 @@ my $contigSeq=shift;
 
 my $flag=shift;
 
+#my  $avg=`samtools mpileup -ABr chr21:16442562-16442689 -d 1000000 /data3/GenomeInABottle/chr21_notAligned.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
+
+#my $test=$avg/2;
+
+#print "average is $test\n";
+
+
+
+#exit;
+
+
 if($flag eq 'filter')
 {
     &filterContigs($inputFile, $contigSeq, $cutoff);
@@ -1065,8 +1076,11 @@ sub getVar_MDstring($)
     my $samFile=shift;
 
 
-    my($cmd, $i, $line, $ref, $read, $operation, @data, $delFlag, $insFlag);
+    my($cmd, $i, $line, $ref, $read, $operation, @data, $delFlag, $insFlag, $refSeq, $altSeq);
     my($delStart, $delEnd, $insStart, $insEnd, $size, $prevPos, $prevContig);
+
+    $refSeq="";
+    $altSeq="";
 
     $cmd="/data/bin/SamTSV/jvarkit/dist-1.128/sam2tsv -r /data/Genomes/human19/allChrhg19InOrder.fa  $samFile > temp.dat";
 
@@ -1085,7 +1099,32 @@ sub getVar_MDstring($)
     #vcf file containing snps
     open(SNP, ">SnpCalls.bed");	
 
+
+
     open(Indels, ">indelCalls.bed");	
+  
+
+
+if(1==1)
+{
+    open(Indels, ">indelCalls.vcf");	
+    
+    print Indels "##fileformat=VCFv4.2\n";
+    print Indels "##reference=hg19\n";
+    print Indels "##INFO=<ID=Contig,Number=1,Type=String,Description=\"Contig id the variant was derived from\">\n";
+    print Indels "##INFO=<ID=Length,Number=1,Type=Integer,Description=\"The length of the indel\">\n";
+    print Indels "##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of indel\">\n";
+    print Indels "##INFO=<ID=AlleleFraction,Number=1,Type=Float,Description=\"The number of reads in contig cluster variant was derived from divided by the coverage in a 200 bp window centered on variant\">\n";
+    print Indels "##FORMAT=<ID=GT,Number=1,Type=Integer,Description=\"Genotype\">\n";
+    print Indels "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNA12878\n";
+ }   
+
+{ my $ofh = select Indels;
+	  $| = 1;
+	  select $ofh;
+}
+
+
     
     $delFlag=0;
     $insFlag=0;
@@ -1107,6 +1146,21 @@ sub getVar_MDstring($)
 
 	chomp($line);
 
+
+	###ONLY USE THIS FOR GENOME IN A BOTTLE###
+
+	if($line!~/chr21/) #only print out variants on chromosome 21
+	{
+	    next;
+	}
+
+	$prevPos=0;
+
+
+
+
+
+
 	#if($#contig>0)
 	#{
 	$prevContig=$contig[$#contig][0]; #storing the contig before whatever contig is on the next line
@@ -1116,17 +1170,48 @@ sub getVar_MDstring($)
 
 	if( ($contig[$#contig][0] ne $prevContig) ) #if on a different contig process the previous contig
 	{
+
+	    $delFlag=0;
+	    $insFlag=0;
+
+	    $prevPos=0;
+
 	    #print "on contig $contig[$#contig][0] line counter is $lineCtr prevContig is $prevContig\n";
 
-	    for($j=0; $j<=$#contig; $j++)
+	    #for($j=0; $j<=$#contig; $j++)
+	    for($j=($#contig * 0.1); $j<=($#contig-($#contig * 0.1)); $j++)
 	    {
-		if($j<($#contig * 0.1) or ($j > $#contig-($#contig * 0.1))  ) #do not call variants based on the edges of contigs much more susceptible to alignment artifacts. 
+	
+		#if($j<($#contig * 0.1) or ($j > $#contig-($#contig * 0.1))  ) #do not call variants based on the edges of contigs much more susceptible to alignment artifacts. 
+		#{
+		 #   next;
+
+		#}
+		
+
+
+	
+		#$prevPos=$data[6];
+
+		#if enter contig in the middle of the variant go until the end of the variant before calling variants
+		if(($contig[$j][6]!~m/^-?\d+\z/ || $contig[$j][3]!~m/^-?\d+\z/) && $prevPos==0)
 		{
 		    next;
-
 		}
-	
-		$prevPos=$data[6];
+
+	      
+
+		if($j>0 && $contig[$j-1][6]=~m/\d+/)
+		{
+		    $prevPos=$contig[$j-1][6];
+		
+		}elsif($contig[$j-1][6]=~m/\d+/)
+		{
+		    $prevPos=$contig[$j][6];
+		}
+
+
+		
 
 		@data=@{$contig[$j]};
 
@@ -1141,20 +1226,34 @@ sub getVar_MDstring($)
 			next;
 		    }
 	    
+	#	    print SNP "$data[2]\t$data[6]\t$data[6]\t$data[4]\t$data[7]\t$data[0]\n"; 
 		    print SNP "$data[2]\t$data[6]\t$data[6]\t$data[4]\t$data[7]\n"; 
 	    
+
 		}
 	    
 		if($data[8] eq "D")
 		{
+		    
+
+
+		    if($delFlag==1)
+		    {
+			$refSeq=$refSeq.$data[7];
+		    }
 
 	    #first base in deleted region
 		    if($delFlag==0)
 		    {
-			$delFlag=1;
-			$delStart=$data[6]-1;
-			$delEnd=$data[6];
 
+		
+
+			$delFlag=1;
+			$delStart=$data[6];
+			$delEnd=$data[6];
+			$refSeq=$contig[$j-1][7].$data[7];
+			$altSeq=$contig[$j-1][7];
+			
 		    }else
 		    {
 		#adding one to size of deleted region 
@@ -1162,18 +1261,35 @@ sub getVar_MDstring($)
 		    }
 	
 
+		   
 
 		}
 
 		if($data[8] eq "I")
 		{
+		    if($insFlag==1)
+		    {
+			$altSeq=$altSeq.$data[4];
+		    }
+
+		    
+		if($contig[$j][0] eq "151019_13")
+		{
+		    my $temp=1;
+
+		}
+
+		    
+
 
 	    #first base in deleted region
 		    if($insFlag==0)
 		    {
 			$insFlag=1;
-			$insStart=$prevPos-1;
+			$insStart=$prevPos;
 			$insEnd=$insStart+1;
+			$refSeq=$contig[$j-1][7];
+			$altSeq=$contig[$j-1][7].$data[4];
 
 		    }else
 		    {
@@ -1191,11 +1307,47 @@ sub getVar_MDstring($)
 	   
 		    if($delFlag==1)
 		    {
-			$size=($delEnd-$delStart)*-1;
+			 #$size=($delEnd-$delStart)*-1; # length to be printed for bed format
+			$size=($delEnd-$delStart);
 			$delStart--;
 			$delEnd--;
-			print Indels "$data[2]\t$delStart\t$delEnd\t$size\n";
-		
+			#print Indels "$data[2]\t$delStart\t$delEnd\t$size\t$data[0]\n";
+
+			#$data[2]=~s/chr//; #removing chr string from chromosome name in order to match genome in a bottle
+
+			#print Indels "$data[2]\t$delStart\t$delEnd\t$size\n";
+			
+			#print Indels "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+
+			#$refSeq=$refSeq.$data[7];
+
+			$refSeq=uc($refSeq);
+			$altSeq=uc($altSeq);
+
+			
+			my $regionStart=$delStart-100;
+			my $regionsEnd=$delStart+100;
+			#my  $avg=`samtools mpileup -ABr $data[2]:$regionStart-$regionsEnd -d 1000000 /data7/PlatinumAlignments/allPlatium.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
+			my $avg=0.001; #temporary fix remove later
+
+			$data[0]=~m/\_(\d+$)/;
+
+			my $numReadsInCluster=$1;
+
+			my $allelFraction=$numReadsInCluster/$avg;
+			#print "$allelFraction\n";
+
+
+			#if(($numReadsInCluster/$avg)>0.10)
+			#{
+			    print Indels "$data[2]\t$delStart\t.\t$refSeq\t$altSeq\t.\tPASS\tContig=$data[0];Length=$size;Type=DEL;AlleleFraction=$allelFraction\tGT\t0/1\n"; #vcf format
+			#}
+			    
+
+			#print Indels "##INFO=<ID=Contig, Number=1, Type=String, Description=\"Contig id the variant was derived from\">\n";
+			#print Indels "##INFO=<ID=Length, Number=1, Type=Integer, Description=\"The length of the indel\">\n";
+			#print Indels "##INFO=<ID=Type, Number=1, Type=String, Description=\"The type of indel\">\n";
+
 			$delFlag=0;
 		    }
  
@@ -1203,8 +1355,42 @@ sub getVar_MDstring($)
 		    if($insFlag==1)
 		    {
 			$size=($insEnd-$insStart)*1;
-			print Indels "$data[2]\t$insStart\t$insEnd\t$size\n";
+			#print Indels "$data[2]\t$insStart\t$insEnd\t$size\t$data[0]\n";
 	    
+			#$data[2]=~s/chr//; #removing chr string from chromosome name in order to match genome in a bottle
+
+			#$insStart--;  #do this for bed format
+			#$insEnd--; #do this for bed format
+
+			#print Indels "$data[2]\t$insStart\t$insEnd\t$size\n";
+	    
+			#$altSeq=$altSeq.$data[4];
+
+			$altSeq=uc($altSeq);
+			$refSeq=uc($refSeq);
+
+
+			my $regionStart=$insStart-100;
+			my $regionsEnd=$insStart+100;
+			#my  $avg=`samtools mpileup -ABr $data[2]:$regionStart-$regionsEnd -d 1000000 /data7/PlatinumAlignments/allPlatium.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
+			my $avg=0.001; #temporary fix remove later
+
+
+			$data[0]=~m/\_(\d+$)/;
+
+			my $numReadsInCluster=$1;
+
+			my $allelFraction=$numReadsInCluster/$avg;
+			#print "$allelFraction\n";
+
+			#if(($numReadsInCluster/$avg)>0.10)
+			#{
+			    
+			    print Indels "$data[2]\t$insStart\t.\t$refSeq\t$altSeq\t.\tPASS\tContig=$data[0];Length=$size;Type=INS;AlleleFraction=$allelFraction\tGT\t0/1\n";
+
+			#}
+			    
+
 			$insFlag=0;
 
 		    }
@@ -1225,6 +1411,57 @@ sub getVar_MDstring($)
 
     close(Indels);
     close(SNP);
+
+
+
+$cmd="time /data/bin/vcflib/bin/vcfstreamsort -a indelCalls.vcf > foo.dat";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+
+#removing duplicate variant calls
+$cmd="time /data/bin/vcflib/bin/vcfuniq foo.dat > indelCalls.vcf";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+
+if(1==2)
+{
+
+#if 2 variants have the same position keep only one of them 
+$cmd="(head -n 7 indelCalls.vcf && tail -n +3 indelCalls.vcf | sort -u -k1,1 -k2,2) > foo.dat";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+
+$cmd="cp foo.dat indelCalls.vcf";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+
+}
+
+
+
+$cmd="cat indelCalls.vcf | vcf-sort > temp.vcf";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+
+
+$cmd="bgzip -c temp.vcf > indelCalls.vcf.gz";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+
+$cmd="tabix -p vcf indelCalls.vcf.gz";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+
+
+
+
 
 
     if(1==2)

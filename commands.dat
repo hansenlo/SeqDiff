@@ -1,1 +1,12 @@
  time perl runJob_BitString.pl /data3/GenomeInABottle/chr21_notAligned.fastq /data3/GenomeInABottle/chr21_notAligned_refSubtracted_humanReadable_notQualityFiltered.dat
+
+
+#--vcf-score-field=Nothing is to turn off the ROC thresholding calculation
+
+time /data/bin/rtg-tools-3.6.1/rtg vcfeval --calls=/home/hansenlo/SeqDiff/IndelComparison/Platypus/platypus_Platniumchr21.vcf.gz --baseline=/data3/GenomeInABottle/allIndels_only_NIST_v2.19.recode_withChr.vcf.gz --bed-regions=/data3/GenomeInABottle/Ver19/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.19_2mindatasets_5minYesNoRatio_withChr.bed -o vcfEvalOutputPlatypus -t /data/Genomes/human19/allChrhg19InOrder_SDF --no-gzip --squash-ploidy --vcf-score-field=Nothing
+
+
+#convert vcf to bed
+sed -e 's/chr//' fn.vcf | awk '{OFS="\t"; if (!/^#/){print $1,$2-1,$2,$4"/"$5,"+"}}' > fn.bed
+
+time perl ../evaluateVariants.pl tp.vcf fp.vcf /data3/GenomeInABottle/allIndels_only_NIST_v2.19.recode_withChr.vcf

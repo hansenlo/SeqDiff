@@ -221,7 +221,7 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
   //{
 
       ctrUnassembled=0;
-      for(i=0; i!=startPositions.size(); ++i) //got through every read looking for unassembled reads
+      for(i=0; i!=startPositions.size(); ++i) //go through every read looking for unassembled reads
 	{
 	  foundFlag=false;
 
@@ -652,6 +652,58 @@ flag=false;
   return contig;
 
 }
+
+
+
+
+ //Given the alignment matrix of reads and the row index and start positition of the 2 reads calculate percent
+//difference of the 2 reads for the aligned regions row1 and row2 are the column indexes for the two reads, start1 and start2 are the 
+//the start columns of the reads in the alignment matrix sizeAligned is the number of aligned bases between the 2 reads the aligned bases may not necassarily match
+uint_fast64_t ReadCluster::numberDiff(vector<vector<char>> &alignmentMatrix, int row1, int row2, int start1, int start2, int &sizeAligned)
+{
+  int startShared, i, j, numCols;
+  int numMismatches;
+
+  sizeAligned=0;
+
+  if(start1>start2)
+    {
+      startShared=start1;
+
+    }else
+    {
+      startShared=start2;
+    }
+
+  for(i=startShared; alignmentMatrix[0].size(); i++)
+    {
+      if(alignmentMatrix[row1][i]!='N' && alignmentMatrix[row2][i]!='N') 
+	{
+	  sizeAligned++;
+	  if(alignmentMatrix[row1][i]!=alignmentMatrix[row2][i])
+	    {
+	      numMismatches++;
+	    }
+
+	}
+
+    }
+
+
+  
+
+
+  //if(startShared>
+
+
+
+
+
+}
+
+
+
+
 
 //give a vector of reads obtain the position of every kmer in every read. 
 //Do not need to worry about reverse complement all reads should be on the 

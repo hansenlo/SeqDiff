@@ -2,6 +2,8 @@
 #include "utilities.h"
 #include "kmerAnalysis.h"
 
+
+
 using std::cout;
 using std::endl;
 using std::cerr;
@@ -11,6 +13,13 @@ using google::dense_hash_map;
 using google::sparse_hash_map;
 using std::vector;
 using std::ofstream;
+//using boost::dynamic_bitset;
+using std::bitset;
+using std::hash;
+
+
+#include <unordered_map>
+
 //example
 
 //variantFinder <exp kmer count file> <exp sequencing lib fastq or fasta> <kmerSize>
@@ -80,18 +89,87 @@ int main(int argc, char *argv[] )
 
    //sparse_hash_map<uint_fast64_t, int, customHash> uniqueKmers;
 
-   dense_hash_map<uint_fast64_t, int, customHash> uniqueKmers;
+  //dense_hash_map<uint_fast64_t, int, customHash> uniqueKmers;
+
+  bitset<bitSetSize> test;
+
+   //test=1*pow(2, (2*kmerSize)-2)+1*pow(2, ((2*kmerSize)-1));
+
+  test.set(test.size()-1);
+
+  //sparse_hash_map<bitset<192>, int, stdHash> temp;
+
+
+  //std::unordered_map<uint_fast64_t, int, customHash> temp;
+
+
+  //std::unordered_map<bitset<bitSetSize>, int, stdHash> temp;
+
+  //  sparse_hash_map<bitset<bitSetSize>, int, stdHash> temp;
+
+  dense_hash_map<bitset<bitSetSize>, int, stdHash> uniqueKmers;
+  
+  
+
+  //size_t hashvalue=boost::hash_value(test.m_bits);
+
+   
+  //hash<bitset<30>> foo;
+
+  //size_t hashvalue=foo(test);
+
+							  
+
+
+   //temp.set_empty_key(NULL);
+
+   
+   //SpookyHash::Hash64(&value, 8, 20)
+
+   
+
+
+  bitset<30> foo, temp, foo2;
+									 
+   foo.set(foo.size()-1);
+
+
+   //cout<<"size of bitset object is "<<test.size()<<" number of bytes is "<<sizeof(test)<<" bit representation is "<<test<<"equality test is "<<(test==foo)<<endl;
+   
+   //   return(0);
+
+
+
+
+
+   //dense_hash_map<bit, int, customHash> uniqueKmers;
+
+
+
+															  //return(0);
+
 
    sparse_hash_map<uint_fast64_t, int, customHash> controlKmers;
 
    //dense_hash_map<uint_fast64_t, int, customHash> uniqueKmers;
   //dense_hash_map<uint_fast64_t, ReadClusters, customHash> clusters;  
 
+   //cerr<<"reached this point before set empty key"<<endl;
+
+   bitset<bitSetSize> emptyKey;
+
+   //################NEED TO ADD CODE MAKING SURE kmer size is small enough this never happesn##############
+   emptyKey.set(bitSetSize-1);
+   
   //clusters.set_empty_key(-20);
-  uniqueKmers.set_empty_key(-20);
-  uniqueKmers.set_deleted_key(-2);
+  uniqueKmers.set_empty_key(emptyKey);
+  //uniqueKmers.set_deleted_key(-2);
   uniqueKmers.resize(100000000);
   //  controlKmers.resize(10000000000);
+  
+
+  //cerr<<"reached this point after set empty key"<<endl;
+
   
 
   //whether or not sequence on continous lines should be connected
@@ -106,11 +184,14 @@ int main(int argc, char *argv[] )
       return(1);
     }
 
+  cerr<<"starting to read in unique kmers "<<endl;
+
   //4 is the kmer count cutoff
   readUniqueKmers(uniqueKmers, continueFlag, uniqueExpKmerCountFile, kmerSize, 8);
 
   
-
+  //return(0);
+														
 
   /*   
    //fout<<"size of hash table is "<<sizeof(allKmers)<<endl;
@@ -140,7 +221,7 @@ int main(int argc, char *argv[] )
     cerr<<"finished getting control kmers"<<endl;
 
       //256 is number of files to split clusters into
-    fileNames=getReads(uniqueKmers, 256, continueFlag, expSeqLib, kmerSize);
+    fileNames=getReads(uniqueKmers, 256, continueFlag, expSeqLib, kmerSize); //NEED TO UNCOMMENT
 
    
 

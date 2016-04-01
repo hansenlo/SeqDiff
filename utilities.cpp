@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include<fstream>
-#include<boost/dynamic_bitset.hpp>
+//#include<boost/dynamic_bitset.hpp>
 
 using std::cout;
 using std::vector;
@@ -43,7 +43,7 @@ void myReplace(std::string& str, const std::string& oldStr, const std::string& n
 }
 
 
-string bit2String( uint_fast64_t number, int kmerSize)
+string bit2String( std::bitset<bitSetSize> &number, int kmerSize)
 {
   
   int i, numberNuc;
@@ -51,14 +51,16 @@ string bit2String( uint_fast64_t number, int kmerSize)
 
   nucString="";
   
-  dynamic_bitset<> bitRep(64, number);
+  //dynamic_bitset<> bitRep(64, number);
   
   
-  to_string(bitRep, bitString);
+  bitString=number.to_string();
+
+  //to_string(bitRep, bitString);
 
 
 
-  for(i=64-(kmerSize*2); i<64; i+=2)
+  for(i=bitSetSize-(kmerSize*2); i<bitSetSize; i+=2)
     {
       nucBit=bitString.substr(i, 2);
       
@@ -227,7 +229,8 @@ void printBitString(vector <uint_fast64_t> &controlCtr1, vector <uint_fast64_t> 
 //arguments are the word size you want to reverse i.e. 8 bits 16 bits etc 
 //and the lookup table which will be populated
 //*******IMPORTANT******* bit reversal is for nucleotide strings!!! don't use bit reversal as universal reversal table*********
-void createBitRevTable(int word, std::vector<uint_fast32_t> &bitTable){
+//*********Also Key word size cannot be bigger than 64 bits!!###########
+void createBitRevTable(int word, std::vector< std::bitset<bitSetSize> > &bitTable){
 
   unsigned long long int size=pow(2, word);
   unsigned long long int i, j, revBitStr;
@@ -283,4 +286,86 @@ void createBitRevTable(int word, std::vector<uint_fast32_t> &bitTable){
 
   //return(bitTable);
 }
+
+
+//BAD programing practice hard code in the reverse complement must change this if I decide to keep 
+void revComplementBitString( std::bitset<bitSetSize> &reversedKey, std::bitset<bitSetSize> &key, std::bitset<bitSetSize> &clearbitWord, std::vector< std::bitset<bitSetSize> > &bitTable, int bitWordSize, int kmerSize)
+{
+
+  /*
+  cout<<"key is "<<key<<endl;
+  cout<<"clearbitWord is "<<clearbitWord<<endl;
+
+  cout<<"integer representation is "<<(key&clearbitWord).to_ulong()<<endl;
+
+
+  cout<<"key now is "<<(key&clearbitWord)<<endl;
+  */
+
+  /*
+  int i, shiftRight, shiftLeft;
+
+  shiftLeft=0;
+
+  for(i=bitSetSize-bitWordSize; i>0; i-=bitWordSize)
+    {
+      shiftRight=i;
+      
+      reversedKey=
+      
+
+      shiftLeft+=bitWordSize;
+    }
+  */
+
+  //cout<<"size of bit table is "<<sizeof(bitTable[0])<<endl;
+
+
+  
+  //super confusing but fast the bit string size is 192 I find the revComplement of the 
+  //first 16 bits then move them to the back of the bit string I then find the reveComplement of
+  //bitst 16 through 32 and then move it to its appropriate place at the back of the bit string 
+  //and so on and so forth
+  reversedKey = (bitTable[(key & clearbitWord).to_ulong()] << 176) | 
+    ( bitTable[( (key >> 16) & clearbitWord ).to_ulong()] << 160) | 
+    (bitTable[ ((key >> 32) & clearbitWord).to_ulong()] << 144) |
+    ( bitTable[( (key >> 48) & clearbitWord ).to_ulong()] << 128) | 
+    (bitTable[ ((key >> 64) & clearbitWord).to_ulong()] << 112) |
+    ( bitTable[( (key >> 80) & clearbitWord ).to_ulong()] << 96) | 
+    (bitTable[ ((key >> 96) & clearbitWord).to_ulong()] << 80) |
+    ( bitTable[( (key >> 112) & clearbitWord ).to_ulong()] << 64) | 
+    (bitTable[ ((key >> 128) & clearbitWord).to_ulong()] << 48) |
+    ( bitTable[( (key >> 144) & clearbitWord ).to_ulong()] << 32) | 
+    (bitTable[ ((key >> 160) & clearbitWord).to_ulong()] << 16) |
+    (bitTable[ ((key >> 176) & clearbitWord).to_ulong()]); 
+
+  reversedKey=reversedKey>>(bitSetSize-kmerSize*2); //need to move the bits that represent nucleotides back into the right side of the bit string
+
+  
+
+  /*
+  reversedKey = (bitTable[key & 0xffff] << 48) | 
+    (bitTable[(key >> 16) & 0xffff] << 32) | 
+    (bitTable[(key >> 32) & 0xffff] << 16) |
+    (bitTable[(key >> 48) & 0xffff]);  
+
+  reversedKey=reversedKey>>(64-kmerSize*2);
+
+  */
+
+
+  /*orginal 64 bit bit reversal
+
+  reversedKey = (bitTable[(key & clearbitWord).to_ulong()] << 48) | 
+    ( bitTable[( (key >> 16) & clearbitWord ).to_ulong()] << 32) | 
+    (bitTable[ ((key >> 32) & clearbitWord).to_ulong()] << 16) |
+    (bitTable[ ((key >> 48) & clearbitWord).to_ulong()]);  
+  */
+
+
+  //  reversedKey=reversedKey>>(64-kmerSize*2);
+  
+  
+
+} 
 

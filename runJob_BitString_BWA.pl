@@ -27,7 +27,7 @@ sub extendAlignments($ $ $ $);
 #Program to take as input a file name containing a read library and running all commands on it
 
 my($cmd, $line, $i, $header, $outputUnique, $outputOverlapEdena, $contigEdgesOutput, $alignmentOutput, $tempIn, $tempOut);
-my($allReads, @splitLine, $path, $outputKmerLib, $dataset, $blastDB);
+my($allReads, @splitLine, $path, $outputKmerLib, $dataset, $blastDB, $tempOutunMappPoorMap);
 
 @splitLine=split(/\//, $expFastq);
 
@@ -55,7 +55,10 @@ $path=$1."/";
 #$blastDB="/data/Bowtie2Index/hg19";
 
 
-$blastDB="/data/Bowtie2Index/hg19GATK";
+#$blastDB="/data/Bowtie2Index/hg19GATK";
+
+$blastDB="/data/BwaIndex/allChrhg19InOrder.fa";
+
 
 
 if(1==1)
@@ -119,8 +122,8 @@ system($cmd)==0
 }
 
 
-#copying files to appropriate places
-if(1==2)
+#copying sequence to appropriate places
+if(1==1)
 {
 #move contigs to appropriate directory
 $cmd="cp /home/hansenlo/SeqDiff/gitHubProject/SeqDiff/contigs.fa /data5/SeqDiffResults/Results/".$header."_contigs.fasta";
@@ -135,8 +138,8 @@ $cmd="cp /data/uniqueReads.fastq /data5/SeqDiffResults/Results/".$header."_uniqu
 print "####cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
-
 }
+
 
 
 #finding the overlap between unique reads
@@ -313,9 +316,9 @@ $alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header.".sam";
 
 #$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
 
-$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data/uniqueReads.fastq --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data/uniqueReads.fastq --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
 
-
+$cmd="time /data/bin/bwa-master/bwa mem -t 20 $blastDB"." /data/uniqueReads.fastq > $alignmentOutput";
 
 
 #fasta command DONT FORGET
@@ -336,8 +339,6 @@ $cmd="samtools view -bS $alignmentOutput > ".$tempOut;
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
-
-
 
 
 #sorting the aligments
@@ -389,7 +390,7 @@ if(1==1)
 ######################Aligning the contigs#####################
 #$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."refGenomeOnly_contigEdges.sam";
 
-$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."_contigs_bowtie2.sam";
+$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."_contigs.sam";
 
 my $contigs="/data5/SeqDiffResults/Results/".$header."_contigs.fasta";
 
@@ -407,7 +408,10 @@ system($cmd)==0
 
 #$blastDB="/home/gabdank/genomes_fasta/elegans_W235_index";
 
-$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2   -p 20 -x $blastDB -f $contigs --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Contigs.fasta "."-S $alignmentOutput";
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2   -p 20 -x $blastDB -f $contigs --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Contigs.fasta "."-S $alignmentOutput";
+
+$cmd="time /data/bin/bwa-master/bwa mem -t 20 $blastDB"." $contigs > $alignmentOutput";
+
 
 #$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 --mp 10 --rdg 3,2 --rfg 3,2  -p 20 -x $blastDB -f $contigs --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Contigs.fasta "."-S $alignmentOutput";
 
@@ -421,7 +425,7 @@ system($cmd)==0
     or die "system $cmd failed\n";
 
 #getting bam files for contig edges alignment
-my $contigheader=$header."_contigs_bowtie2";
+my $contigheader=$header."_contigs";
 $tempOut="/data5/SeqDiffResults/Results/Alignment/".$contigheader.".bam";
 
 #converting alignments to bam format
@@ -429,7 +433,6 @@ $cmd="samtools view -bS $alignmentOutput > ".$tempOut;
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
-
 
 #sorting the aligments
 $tempIn=$tempOut;
@@ -449,18 +452,55 @@ print "#######cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
 
-#convert to bed file all alignments
-$tempOut="/data5/SeqDiffResults/Results/Alignment/".$contigheader.".sorted.bed";
-$cmd="bamToBed -i $tempIn > $tempOut";
+
+##Getting the unmapped contigs
+my $tempOutUnMapped="/data5/SeqDiffResults/Results/Alignment/".$contigheader."_unmapped.sam";
+
+$cmd="time samtools view -f 4 $tempIn > $tempOutUnMapped";
+print "#######cmd is $cmd\n\n";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+
+##Getting the contigs that mapped with poor mapping quality i.e. mapping quality < 8
+my $tempOutPoorMap="/data5/SeqDiffResults/Results/Alignment/".$contigheader."_poorlyMapped.sam";
+$cmd="time samtools view -h $tempIn".'| awk \'{if(\$1 ~ /^@/) {print \$0} else if(\$5<8) {print \$0}}\' |'."samtools view -hSo $tempOutPoorMap -";
+print "#######cmd is $cmd\n\n";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+#Converting to fasta format and concentanating files
+#$tempOut="/data5/SeqDiffResults/Results/Alignment/".$contigheader."_temp.sam"
+$cmd="time samtools bam2fq $tempOutUnMapped > temp.fa";
+print "#######cmd is $cmd\n\n";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+$cmd="time samtools bam2fq $tempOutPoorMap > foo.fa";
+print "#######cmd is $cmd\n\n";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+#concatenating files
+$tempOutunMappPoorMap="/data5/SeqDiffResults/Results/Alignment/".$contigheader."_unMapped_poorlyMapped.fasta";
+$cmd="time cat temp.fa foo.fa > $tempOutunMappPoorMap";
+print "#######cmd is $cmd\n\n";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+#removing intermediate files
+$cmd="rm foo.fa temp.fa";
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
 
 
 
+
+
 #creating a unique alignment
 $tempOut="/data5/SeqDiffResults/Results/Alignment/".$contigheader.".sorted.unique.bam";
-$cmd="samtools view -bq 7 $tempIn > $tempOut";
+$cmd="samtools view -bq 20 $tempIn > $tempOut";
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
@@ -486,6 +526,15 @@ system($cmd)==0
 
 
 #######################now working with contig edges###################
+
+print "Starting iterative alignment\n";
+#iterativeAlignment($tempOutunMappPoorMap, 20, 80,  $blastDB, $header);
+
+#&iterativeAlignment("/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs_unMapped_poorlyMapped.fasta", 20, 80,  $blastDB, $header);
+
+print "Starting to extend alignments\n";
+#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs_unMapped_poorlyMapped.fasta");
+
 
 if(1==2)
 {
@@ -524,6 +573,9 @@ $alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."_contigEdge
 #$blastDB="/home/gabdank/genomes_fasta/elegans_W235_index";
 
 $cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 --local -x $blastDB -f $contigEdgesOutput --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_ContigEdges.fasta "."-S $alignmentOutput";
+
+$cmd="time /data/bin/bwa-master/bwa mem -t 20 $blastDB"." $contigEdgesOutput > $alignmentOutput";
+
 
 #$cmd="/data/bin/STAR_2.3.0e.Linux_x86_64/STAR --genomeDir /data/StarGenomes/hg19 --outSAMunmapped Within --readFilesIn $contigEdgesOutput --runThreadN 20 --outFileNamePrefix Test/test --outFilterMismatchNmax 6"; 
 
@@ -628,6 +680,9 @@ $alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header.".sam";
 
 $cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."$controlFile --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable.fastq "."-S $alignmentOutput";
 
+$cmd="time /data/bin/bwa-master/bwa mem -t 20 $blastDB"." $controlFile > $alignmentOutput";
+
+
 
 #$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/seqA "."-f /data5/SeqDiffResults/Results/"."foo.dat.cap.contigs --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable.fastq "."-S $alignmentOutput";
 
@@ -677,6 +732,8 @@ system($cmd)==0
     or die "system $cmd failed\n";
 }
 
+
+
 sub iterativeAlignment($ $ $ $ $)
 {
     my $contigs=shift;
@@ -687,7 +744,7 @@ sub iterativeAlignment($ $ $ $ $)
 
 
     my(@samOutput, $flag, $size, $i, @readsToReAlign, %contigs, $contigID, $locationContigs, $j);
-    my($seq, $ctr, $start, $end, $strand, %multi, $key, $k);
+    my($seq, $ctr, $start, $end, $strand, %multi, $key, $k, $l, $rowSize);
 
 
     $ctr=0;
@@ -696,11 +753,13 @@ sub iterativeAlignment($ $ $ $ $)
     open(wasMapped, ">mappedReads_IDs.dat");
 
 
-    system("cp $contigs needToBeMapped.fasta");
+    #system("cp $contigs needToBeMapped.fasta");
     #open(needMapped, ">needToBeMapped.fasta");
     
 
     open(willNotMap, ">finalMultiMapping.bed");
+
+    open(mappedSam, ">mappedEnds.sam");
 
 
     %contigs=&readFasta($contigs);
@@ -741,10 +800,18 @@ sub iterativeAlignment($ $ $ $ $)
 
 	#$cmd="/data/bin/STAR_2.3.0e.Linux_x86_64/STAR --genomeDir /data/StarGenomes --outSAMunmapped Within --readFilesIn needToBeMapped.fasta --runThreadN 20 --outFileNamePrefix Test/test --outFilterMismatchNmax 6"; 
 
-	$cmd="/data/bin/STAR_2.3.0e.Linux_x86_64/STAR --genomeDir /data/StarGenomes/hg19 --outSAMunmapped Within --readFilesIn needToBeMapped.fasta --runThreadN 20 --outFileNamePrefix Test/test --outFilterMismatchNmax 6"; 
+	#$cmd="/data/bin/STAR_2.3.0e.Linux_x86_64/STAR --genomeDir /data/StarGenomes/hg19 --outSAMunmapped Within --readFilesIn needToBeMapped.fasta --runThreadN 20 --outFileNamePrefix Test/test --outFilterMismatchNmax 6"; 
 
 
-	
+#	$cmd="time /data/bin/bwa-master/bwa mem -t 20 $blastDB"." needToBeMapped.fasta > $alignmentOutput"; #this command will not work with reads shorter than about 70 bps
+
+#bwa commands to run alignment on short reads and covert to sam format
+	$cmd="time /data/bin/bwa-master/bwa aln -t 20 /data/BwaIndex/allChrhg19InOrder.fa needToBeMapped.fasta > reads.sai";
+	print "#######cmd is $cmd\n\n";
+	system($cmd)==0
+	    or die "system $cmd failed\n";
+
+	$cmd="time /data/bin/bwa-master/bwa samse /data/BwaIndex/allChrhg19InOrder.fa reads.sai needToBeMapped.fasta > $alignmentOutput";
 	print "#######cmd is $cmd\n\n";
 	system($cmd)==0
 	    or die "system $cmd failed\n";
@@ -787,7 +854,25 @@ sub iterativeAlignment($ $ $ $ $)
 	#skip header lines
 	    if($samOutput[$i][0]=~m/^\@/)
 	    {
+		#print out the header for the sam file
+		if($j==($startSize+1))
+		{
+	
+		    $rowSize=@{$samOutput[$i]};
+		    for($l=0; $l<$rowSize; $l++)
+		    {
+			if($l<($rowSize-1))
+			{
+			    print mappedSam "$samOutput[$i][$l]\t";
+			}else
+			{
+			    print mappedSam "$samOutput[$i][$l]";
+			}
+		    }
 
+		    print mappedSam "\n";
+		}
+		
 		next;
 	    }
     
@@ -821,7 +906,7 @@ sub iterativeAlignment($ $ $ $ $)
 	    #also checking to make sure no soft clipping by looking for S in Cigar string
 #bowtie mapping quality	    
 #if($samOutput[$i][4]>15)
-	    if($samOutput[$i][4]==255 && $samOutput[$i][5]!~/S/)
+	    if($samOutput[$i][4]>30 && $samOutput[$i][5]!~/S/)
 	    {
 	    
 
@@ -839,7 +924,6 @@ sub iterativeAlignment($ $ $ $ $)
 
 		}
 
-
 		
 
 
@@ -848,6 +932,22 @@ sub iterativeAlignment($ $ $ $ $)
 		    my $temp=1;
 
 		}
+
+
+		$rowSize=@{$samOutput[$i]};
+		#print out the alignment record for the contig edge that was mapped
+		for($l=0; $l<$rowSize; $l++)
+		{
+		    if($l<($rowSize-1))
+		    {
+			print mappedSam "$samOutput[$i][$l]\t";
+		    }else
+		    {
+			print mappedSam "$samOutput[$i][$l]";
+		    }
+		}
+
+		print mappedSam "\n";
 
 		
 		
@@ -902,6 +1002,42 @@ sub iterativeAlignment($ $ $ $ $)
 
 
     print "will not map is $ctr\n";
+
+
+    close mappedSam;
+
+
+#converting alignments to bam format
+    $cmd="samtools view -bS mappedEnds.sam > mappedEnds.bam";
+    print "#######cmd is $cmd\n\n";
+    system($cmd)==0
+	or die "system $cmd failed\n";
+
+
+#sorting the aligments
+#sorting bam files
+    $cmd="samtools sort -m 40000000000 mappedEnds.bam mappedEnds.sorted";
+    print "#######cmd is $cmd\n\n";
+    system($cmd)==0
+	or die "system $cmd failed\n";
+
+#creating an index
+    $cmd="samtools index mappedEnds.sorted.bam";
+    print "#######cmd is $cmd\n\n";
+    system($cmd)==0
+	or die "system $cmd failed\n";
+
+#moving bam file to correct directory
+    $cmd="mv mappedEnds.sorted.bam\*  /data5/SeqDiffResults/Results/Alignment";
+    print "#######cmd is $cmd\n\n";
+    system($cmd)==0
+	or die "system $cmd failed\n";
+
+    #removing intermediate files
+    $cmd="rm mappedEnds.bam";
+    print "#######cmd is $cmd\n\n";
+    system($cmd)==0
+	or die "system $cmd failed\n";
 
 }
 
