@@ -14,7 +14,7 @@ using std::ofstream;
 using std::ios;
 using std::cerr;
 using std::pair;
-
+using std::list;
 
 /*
 ReadCluster::ReadCluster(long numReads){
@@ -100,17 +100,19 @@ void ReadCluster::printReads()
 }
 
 //kmer size and a cutoff representing the minimum number of times the max nucleotide must occur to be counted
-string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &debugging, long clusterID)
+void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, int cutoffMinNuc, std::ofstream &debugging, vector<string> &clusterID)
 {
 
+  double Nctr, nucCtr, badColCtr;
   long int numCol;
   int numReads=readSeqs.size();
   int i, j, z, maxCtr, indexMax, posN, readSize;
-  vector<int> nuc(4, 0); //A T G C
+
   string combinedNuc;
   string allNucs="ATGC";
   bool flag=false;
-  double Nctr, nucCtr, badColCtr;
+
+  vector<int> nuc(4, 0); //A T G C
  
   
   int qualityCutoff=20; //This is the base score quality cutoff if the base quality is less than this number than ignore that base
@@ -385,8 +387,6 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
 				    {
 				      matrix[i][k+start]=readSeqs[i][ctr]; //if a good quality base than use that bases nucleotide value	 
 				    }
-
-
 				
 			      
 				  ctr++;
@@ -412,20 +412,299 @@ string ReadCluster::mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &de
     
       //}
 
+      //Assembling the contig from the matrix of aligned reads
+      std::vector<int> rowsToAssemble(matrix.size());
+      std::iota(rowsToAssemble.begin(), rowsToAssemble.end(), 0); //for the initial assembly use all reads
+
+      combinedNuc=assembleContig(matrix, rowsToAssemble, nucCtr, badColCtr, cutoffMinNuc, Nctr);
+  
+
+      /*
+#pragma omp critical(DEBUGGING_CLUSTER)
+  {  
+  //printing the matrix
+  //raw matrix before filtering
+  
+    numCol=matrix[0].size(); //all rows are the same size  
+    for(i=0; i<numReads; i++)
+      {
+	for(j=0; j<numCol; j++)
+	  {
+	  //matrix[i][((numCol/2)-startPositions[i])+j]=readSeq[i][j];
+	
+	    debugging<<matrix[i][j];
+	  }
+	debugging<<endl;
+      }
+
+    debugging<<"cluster being assembled is  "<<clusterID<<endl;
+    debugging<<"contig is "<<combinedNuc<<endl;
+    debugging<<"percentage of bad columns is "<<badColCtr/combinedNuc.length()<<endl;
+    debugging<<"finished printing out the matrix "<<endl;
+    debugging<<"##############################################\n\n\n\n"<<endl;
+  
+
+  }
+      */
+
+      
+      double percentBadCol, percentNs;
+
+
+      checkContig(combinedNuc, readSize, badColCtr, Nctr, percentBadCol, percentNs);
+
+      string printableClusterID=clusterID[0];
+    
+      printMatrix(matrix, rowsToAssemble, combinedNuc, percentBadCol, printableClusterID, debugging); //debugging only print alignment Matrix
+
+      if(combinedNuc.compare("0")!=0)
+	{
+	  contigs.push_back(combinedNuc);
+	  
+	}
+
+
+  if(combinedNuc.compare("0")==0) //if the contig is noisy it may be the cluster is impure try and find subclusters that assembly better
+    {
+      if(numReads>(2*cutoffMinNuc)) //making sure can break up the cluster into 2 or more clusters with the mininum number of reads to pass the cutoff
+	{
+	  //cerr<<"debugging contig is "<<combinedNuc<<endl;	  
+
+	  //generating the matrix of distances between every 2 aligned sequences in the alignmentMatrix
+	  //The distance will be stored only if the number of aligned bases meet a certain standard otherwise it will be set to 0
+	  //vector<vector<int>> numMatches(numReads, vector<int>(numReads, -1)); //number of basepair matches between 2 sets of aligned sequences
+
+	  //vector<vector<int>>numMatches(numReads, vector<int>(numReads, -1));
+
+	  Graph graphMatches(numReads);
+
+	  getDistanceGraph(matrix, startMatrix, graphMatches, readSize);
+	   
+	  vector<bool> visited(numReads, false);
+	  vector<int> cluster;
+	  
+	  int clusterCtr=0;
+	  for(int d=0; d<numReads; d++)
+	    {
+	      if(visited[d])
+		{
+		  continue;
+		}else
+		{
+
+		  cluster.clear();
+		   //vector to hold the given cluster
+		  //cerr<<"getting the subcluster starting with read "<<d<<endl;
+		  graphMatches.DFS(d, cluster, visited); //print the subcluster that includes read 0
+	
+		  /*
+		  int z;
+		  for( z=0; z<cluster.size(); z++)
+		    {
+		      cerr<<cluster[z]<<" ";
+    
+		    }
+		  cerr<<endl;
+		  */
+
+		}
+
+	      if(cluster.size() > cutoffMinNuc)
+		{
+
+		  clusterCtr++;
+
+		  combinedNuc=assembleContig(matrix, cluster, nucCtr, badColCtr, cutoffMinNuc, Nctr);
+
+		  //cerr<<"contig of subcluster is "<<combinedNuc<<endl;
+
+		  checkContig(combinedNuc, readSize, badColCtr, Nctr, percentBadCol, percentNs);
+	      
+		  string subClusterID=clusterID[0]+"_"+std::to_string(clusterCtr);
+
+		  printMatrix(matrix, cluster, combinedNuc, percentBadCol, subClusterID, debugging); //debugging only print alignment Matrix
+	  
+		  //adding the new contig to the set of contigs
+		  contigs.push_back(combinedNuc); 
+		  clusterID.push_back(subClusterID);
+		  
+		}
+
+	    }
+	  
+	  /*
+	  cerr<<"got distance matrix starting sub clusters"<<endl;
+
+	  vector<vector<int>> clusters; //matrix to hold all the subclusters
+
+	  getSubClusters(numMatches, clusters); //extracting subclusters from the data
+	  
+	  cerr<<"number of total reads is "<<numReads<<endl;
+
+	  cerr<<"number of clusters is "<<clusters.size()<<endl;
+
+	  for(i=0; i<clusters.size(); i++)
+	    {
+	      combinedNuc=assembleContig(matrix, clusters[i], nucCtr, badColCtr, cutoffMinNuc, Nctr);
+
+	      //cerr<<"contig of subcluster "<<i<<" is "<<combinedNuc<<endl;
+
+	      checkContig(combinedNuc, readSize, badColCtr, Nctr, percentBadCol, percentNs);
+	      
+	      string subClusterID=std::to_string(clusterID)+std::to_string(i);
+
+	      printMatrix(matrix, clusters[i], combinedNuc, percentBadCol, subClusterID, debugging); //debugging only print alignment Matrix
+
+	
+	    }
+
+	  */
+	 
+
+
+	  //exit(0);
+	}
+    
+    }
+
+
+
+
+//Given the alignment matrix of reads and the row index and start positition of the 2 reads calculate percent
+//difference of the 2 reads for the aligned regions row1 and row2 are the column indexes for the two reads, start1 and start2 are the 
+//the start columns of the reads in the alignment matrix sizeAligned is the number of aligned bases between the 2 reads the aligned bases may not necassarily match
+//function returns the number of matches
+//uint_fast64_t ReadCluster::numberDiff(vector<vector<char>> &alignmentMatrix, int row1, int row2, int start1, int start2, int &sizeAligned)
+
+ 
+
+
+
+
+
+  //cerr<<"reached this point in merge cluster "<<combinedNuc<<endl;
+  
+  //  contig=combinedNuc;
+
+    /*
+    myfile<<"####################Start of matrix###########################"<<endl;
+             
+    if(combinedNuc.length()>=10)
+      { 
+	for(i=0; i<numReads; i++)
+	  {
+	    for(j=0; j<numCol; j++)
+	      {
+	  //matrix[i][((numCol/2)-startPositions[i])+j]=readSeq[i][j];
+	
+		myfile<<matrix[i][j];
+	      }
+	    myfile<<endl;
+	  }
+    
+	myfile<<endl;
+	myfile<<endl;
+
+	myfile<<"contig is "<<combinedNuc<<endl;
+      }
+
+    myfile<<endl;
+    myfile<<"percent of bad columns is "<<(badColCtr/combinedNuc.length())<<endl;
+    myfile<<endl;
+
+    myfile.close();
+    */
+
+  //return "test";
+  //return contig;
+
+}
+
+
+
+
+ //Given the alignment matrix of reads and the row index and start positition of the 2 reads calculate percent
+//difference of the 2 reads for the aligned regions row1 and row2 are the column indexes for the two reads, start1 and start2 are the 
+//the start columns of the reads in the alignment matrix sizeAligned is the number of aligned bases between the 2 reads the aligned bases may not necassarily match
+//function returns the number of matches
+uint_fast64_t ReadCluster::numberDiff(vector<vector<char>> &alignmentMatrix, int row1, int row2, int start1, int start2, int &sizeAligned, int readSize)
+{
+  int startShared, i, j, numCols;
+  int numMatches;
+
+  sizeAligned=0;
+
+  if(start1>start2)
+    {
+      startShared=start1;
+
+    }else
+    {
+      startShared=start2;
+    }
+
+  int endAlignmentIndex;
+
+  if((startShared+readSize) > alignmentMatrix[0].size())
+    {
+
+      endAlignmentIndex=alignmentMatrix[0].size();
+
+    }else
+    {
+      endAlignmentIndex=startShared+readSize;
+    }
+
+
+  /*
+  cerr<<"row1 and row2 are "<<row1<<" "<<row2<<endl;
+  cerr<<"start1 and start2 are "<<start1<<" "<<start2<<" startShared is "<<startShared<<endl;
+  cerr<<"number of columns in matris is "<<alignmentMatrix[0].size()<<endl;
+  */
+
+  numMatches=0;
+
+  for(i=startShared; i<endAlignmentIndex; i++)
+    {
+      
+      if(alignmentMatrix[row1][i]!='N' && alignmentMatrix[row2][i]!='N') 
+	{
+	  sizeAligned++;
+	  if(alignmentMatrix[row1][i]==alignmentMatrix[row2][i])
+	    {
+	      numMatches++;
+	    }
+
+	}
+
+    }
 
   
+  return numMatches;
+
+}
+
+string ReadCluster::assembleContig(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, double &nucCtr, double &badColCtr, int cutoffMinNuc, double &Nctr)
+{
   
+  bool flag;
+  int numCol, i, j, k, sizeReadsToUse, indexMax, posN;
+  vector<int> nuc(4, 0); //A T G C
+  string combinedNuc;
+  string allNucs="ATGC";
 
-
-string validChar = "ACGTacgt";
+  string validChar = "ACGTacgt";
   
-flag=false;
+  flag=false;
 
- Nctr=0; //counter to keep track of number of Ns in the contig getting assembled
+  Nctr=0; //counter to keep track of number of Ns in the contig getting assembled
 
- badColCtr=0;
+  badColCtr=0;
 
- numCol=matrix[0].size(); //all rows are the same size
+  numCol=alignmentMatrix[0].size(); //all rows are the same size
+  sizeReadsToUse=rowsToAssemble.size();
+
+  int currentRow=0; //index into the current rows to assemble vector
 
   for(i=0; i<numCol; i++)
     {
@@ -437,18 +716,23 @@ flag=false;
 
       nucCtr=0;
       
-      for(j=0; j<numReads; j++)
+      //for every column run through all the rows that will be used in this assembly
+      for(k=0; k<sizeReadsToUse; k++)
 	{
+	  j=rowsToAssemble[k]; //j is row index to use in assembly
+
+	  //cerr<<"row is "<<j<<endl;
 	  /*
-	  if (validChar.find(matrix[j][i]) == std::string::npos) { 
+	  if (validChar.find(alignmentMatrix[j][i]) == std::string::npos) { 
 	    continue;
 	  }else
 	    {
-	      cout<<"nuc is "<<matrix[j][i]<<endl;
+	      cout<<"nuc is "<<alignmentMatrix[j][i]<<endl;
 	    }
 	  */
 
-	   switch(matrix[j][i])
+	   
+	  switch(alignmentMatrix[j][i])
 		    {
 		    case 'A' :
 		      nuc[0]=nuc[0]+1;
@@ -498,13 +782,12 @@ flag=false;
 	}
 
       
-      
 
-      
+
+     
 
       indexMax=-1;
       indexMax=distance(nuc.begin(), std::max_element(nuc.begin(), nuc.end()));
-
 
       
       if(nuc[indexMax] >= cutoffMinNuc && ((nuc[indexMax]/nucCtr) > 0.75)) //filtering clusters
@@ -527,9 +810,6 @@ flag=false;
 
  
 
-
-
-
 /*
       if(nuc[indexMax]>cutoffMinNuc)
 	{	
@@ -537,7 +817,6 @@ flag=false;
 	}
 
 */
-
 
 
 
@@ -551,7 +830,6 @@ flag=false;
 
     }
   
-
   
 
   posN=combinedNuc.find_last_not_of( 'N' ) +1;
@@ -563,145 +841,222 @@ flag=false;
   combinedNuc.erase( posN ); 
 
 
+  return(combinedNuc);
+
+}
+
+
+void ReadCluster::getDistanceGraph(std::vector<std::vector<char>> &alignmentMatrix, vector<int> &startMatrix,  Graph &numMatches, int readSize)
+{
+  int numReads=alignmentMatrix.size();
+
+  int z, y;
+
+
+  //cerr<<"printing the distances "<<endl;
+	  for(z=0; z<numReads; z++)
+	    {
+
+	      
+	      for(y=(z+1); y<numReads; y++)
+		{
+		  
+		  int sizeAligned=0;
+
+		  
+
+		  int numMatch=numberDiff(alignmentMatrix, z, y, startMatrix[z], startMatrix[y], sizeAligned, readSize);
+
+	
+		  if((double(numMatch)/double(sizeAligned)) > 0.95 && sizeAligned > (readSize*0.9) ) //at least 95 percent of the aligned Reads must match with an alignment length of at least 20
+		    {
+		      //cerr<<numMatch<<" ";
+
+		      //numMatches[z][y]=numMatch;
+		      
+		      //add new edges to the graph linking the two reads
+		      numMatches.addEdge(z, y);
+		      numMatches.addEdge(y, z);
+
+
+		    }else if((double(numMatch)/double(sizeAligned)) < 0.5 && sizeAligned>20) //if 2 reads align but they do not match then set the number of matches between them to a negative number
+		    {
+		      //numMatches[z][y]=-1*numMatch;
+		    }else
+		    {
+		      //numMatches[z][y]=0;
+		    }
+		    
+		  
+		}
+
+	      //cerr<<endl;
+	    }
+
+	  
+}
+
+void ReadCluster::getSubClusters(vector<vector<int>> &numMatches, vector<vector<int>> &clusters)
+{
+  
+  int numReads=numMatches.size();
+  int z, y, clusterCtr;
+  bool addedARead; //a variable to record if having gone through every read in the aligment matrix at least one of them was added to a cluster if I never add a read to a cluster then stop the algorithm
+
+
+  int notInClusterFlag;
+
+  dense_hash_map<int_fast64_t, int_fast64_t, customHash> inCluster; //hash table the key is a row index the value is which cluster the read corresponding to that row is found in. The value is an index into the clusters vector
+  inCluster.set_empty_key(-1);
+
+  dense_hash_map<int_fast64_t, int_fast64_t, customHash> needsCluster; //hash table the key is a row index the value does not matter just need to record which rows are not in a cluster but also do not match any existing clusters will set the value to 1
+  needsCluster.set_empty_key(-1);
+  needsCluster.set_deleted_key(-2);
+
+
+
+  clusterCtr=0;
+
+  for(z=0; z<numReads; z++)
+    {
+      /*
+      if(inCluster.count(z)>0) //if read is already assigned to a cluster skip it
+	{
+	  continue;
+	}
+      */
+
+
+      for(y=(z+1); y<numReads; y++)
+	{
+
+	  //see getDistanceFunction I set a cutoff there if percent of matches for the alignment is 0.95 or greater and the size of the Aligned region is 20 then number of Matches is positive otherwise
+	  //it is set to 0 or a negative number
+	  if(numMatches[z][y]>0) 
+	    {
+	      if(clusters.size()==0) //add a new cluster if there are no clusters
+		{
+		  vector<int> temp;
+
+		  temp.push_back(z);
+		  temp.push_back(y);
+
+		  clusters.push_back(temp);
+		  
+		  inCluster[z]=clusterCtr;
+		  inCluster[y]=clusterCtr;
+		  
+		  clusterCtr++;
+		  continue;
+		}
+
+	      if(needsCluster.count(z)>0 || needsCluster.count(y)>0) //if read 1 or read 2 needs a cluster
+		{
+		  vector<int> temp;
+
+		  temp.push_back(z);
+		  temp.push_back(y);
+
+		  clusters.push_back(temp);
+		  
+		  inCluster[z]=clusterCtr;
+		  inCluster[y]=clusterCtr;
+ 
+		  clusterCtr++;
+		  
+		  needsCluster.erase(z);
+		  needsCluster.erase(y);
+
+		  if(needsCluster.count(z)>0)
+		    {
+		      cerr<<"Mistake!! element should not exist "<<endl;
+		    }
+
+		  continue;
+		} 
+
+	      
+
+	      if(inCluster.count(z)==0 && inCluster.count(y)>0) //if second read is in cluster but first read isn't add the first read to the second reads cluster
+		{
+		  clusters[inCluster[y]].push_back(z);  //value in hash table is a row into the clusters vector
+		  inCluster[z]=inCluster[y]; //adding the first read to the hash table recording which cluster a read belongs to 
+
+		}
+
+	      if(inCluster.count(y)==0 && inCluster.count(z)>0) //if first read is in cluster but second read isn't add the second read to the first reads cluster
+		{
+		  clusters[inCluster[z]].push_back(y);  //value in hash table is a row into the clusters vector
+		  inCluster[y]=inCluster[z]; //adding the 2nd read to the hash table recording which cluster a read belongs to 
+
+		}
+
+	    }
+
+
+	  if(numMatches[z][y] < -1) //if number of matches is less than -1 than means reads overlap well but do not align well with many mismatches
+	    {
+	      if(inCluster.count(z)==0 && inCluster.count(y)>0) //first read is not in a cluster second read is in a cluster hence first read does not belong in the same cluster as the second read 
+		{
+		  needsCluster[z]=1;
+		}
+
+	      if(inCluster.count(y)==0 && inCluster.count(z)>0) //first read is not in a cluster second read is in a cluster hence first read does not belong in the same cluster as the second read 
+		{
+		  needsCluster[y]=1;
+		}
+
+
+	    }
+
+
+	}
+    }
+
+
+}
+
+void ReadCluster::printMatrix(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, string &combinedNuc, double &percentBadCol, string &clusterID, std::ofstream &debugging)
+{
+  int numCol, i, j, k;
+
+  int sizeReadsToUse=rowsToAssemble.size();
 
 #pragma omp critical(DEBUGGING_CLUSTER)
-  {
-    
+  {  
   //printing the matrix
   //raw matrix before filtering
   
-    numCol=matrix[0].size(); //all rows are the same size  
-    for(i=0; i<numReads; i++)
+    numCol=alignmentMatrix[0].size(); //all rows are the same size  
+
+    for(k=0; k<sizeReadsToUse; k++)
       {
+	i=rowsToAssemble[k];
+
 	for(j=0; j<numCol; j++)
 	  {
 	  //matrix[i][((numCol/2)-startPositions[i])+j]=readSeq[i][j];
 	
-	    debugging<<matrix[i][j];
+	    debugging<<alignmentMatrix[i][j];
+	  
 	  }
 	debugging<<endl;
       }
 
+    
     debugging<<"cluster being assembled is  "<<clusterID<<endl;
     debugging<<"contig is "<<combinedNuc<<endl;
-    debugging<<"percentage of bad columns is "<<badColCtr/combinedNuc.length()<<endl;
+    debugging<<"percentage of bad columns is "<<percentBadCol<<endl;
     debugging<<"finished printing out the matrix "<<endl;
     debugging<<"##############################################\n\n\n\n"<<endl;
-  
+    
 
   }
 
 
-  if(combinedNuc.length() < (readSize/2)) //if contig to short throw it out
-    {
-      return "0";
-    }
-
-
-
-
-
-  if((badColCtr/combinedNuc.length())>0.1) //if to many bad columns throw it out
-    {
-      return "0";
-    }
-
-  //if number of not confident nucleotide calls is greater than 10% of the contig throw it out
-  if((Nctr/combinedNuc.length())>0.1)
-    {
-      combinedNuc="0";
-    }
-    
-
-
-
-  //cerr<<"reached this point in merge cluster "<<combinedNuc<<endl;
-  
-    contig=combinedNuc;
-
-    /*
-    myfile<<"####################Start of matrix###########################"<<endl;
-             
-    if(combinedNuc.length()>=10)
-      { 
-	for(i=0; i<numReads; i++)
-	  {
-	    for(j=0; j<numCol; j++)
-	      {
-	  //matrix[i][((numCol/2)-startPositions[i])+j]=readSeq[i][j];
-	
-		myfile<<matrix[i][j];
-	      }
-	    myfile<<endl;
-	  }
-    
-	myfile<<endl;
-	myfile<<endl;
-
-	myfile<<"contig is "<<combinedNuc<<endl;
-      }
-
-    myfile<<endl;
-    myfile<<"percent of bad columns is "<<(badColCtr/combinedNuc.length())<<endl;
-    myfile<<endl;
-
-    myfile.close();
-    */
-
-  //return "test";
-  return contig;
-
-}
-
-
-
-
- //Given the alignment matrix of reads and the row index and start positition of the 2 reads calculate percent
-//difference of the 2 reads for the aligned regions row1 and row2 are the column indexes for the two reads, start1 and start2 are the 
-//the start columns of the reads in the alignment matrix sizeAligned is the number of aligned bases between the 2 reads the aligned bases may not necassarily match
-uint_fast64_t ReadCluster::numberDiff(vector<vector<char>> &alignmentMatrix, int row1, int row2, int start1, int start2, int &sizeAligned)
-{
-  int startShared, i, j, numCols;
-  int numMismatches;
-
-  sizeAligned=0;
-
-  if(start1>start2)
-    {
-      startShared=start1;
-
-    }else
-    {
-      startShared=start2;
-    }
-
-  for(i=startShared; alignmentMatrix[0].size(); i++)
-    {
-      if(alignmentMatrix[row1][i]!='N' && alignmentMatrix[row2][i]!='N') 
-	{
-	  sizeAligned++;
-	  if(alignmentMatrix[row1][i]!=alignmentMatrix[row2][i])
-	    {
-	      numMismatches++;
-	    }
-
-	}
-
-    }
-
-
-  
-
-
-  //if(startShared>
-
-
-
 
 
 }
-
-
 
 
 
@@ -1040,6 +1395,46 @@ void ReadCluster::printKmerPositions()
 
 
 }
+
+ 
+void Graph::addEdge(int v, int w)
+{
+    graph[v].push_back(w); // Add w to v’s list.
+}
+ 
+void Graph::DFSUtil(int v, std::vector<bool> &visited, std::vector<int> &cluster)
+{
+    // Mark the current node as visited and store it
+  visited[v] = true;
+    //cerr << v << " ";
+ 
+  cluster.push_back(v);
+
+    // Recur for all the vertices adjacent to this vertex
+    list<int>::iterator i;
+    for (i = graph[v].begin(); i != graph[v].end(); ++i)
+        if (!visited[*i])
+	  DFSUtil(*i, visited, cluster);
+}
+ 
+// DFS traversal of the vertices reachable from v. It uses recursive DFSUtil()
+void Graph::DFS(int v, std::vector<int> &cluster, std::vector<bool> &visited)
+{
+    // Mark all the vertices as not visited
+    //bool *visited = new bool[V];
+    
+  // vector<bool> visited(graph.size());
+
+  //for (int i = 0; i < graph.size(); i++)
+  //visited[i] = false;
+ 
+  //  cerr<<"started the recursive helper function "<<endl;
+    // Call the recursive helper function to print DFS traversal
+  DFSUtil(v, visited, cluster);
+}
+ 
+
+
 
 /*
 void ReadCluster::setUsedReadsFalse()

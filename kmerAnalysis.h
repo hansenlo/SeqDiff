@@ -46,4 +46,6 @@ std::vector<std::string> getReads(google::dense_hash_map<std::bitset<bitSetSize>
 //function to read in Clusters do some filtering and pass the filtered Clusters to be assembled
 void readInCluster(std::string &fileName, int cutoffClusterSize, int clusterKmerSize, int tid,  std::ofstream &contigOut, long &clusterNumber, std::ofstream &debuggingMatrix); //tid is for debugging purposes variable stores the thread id
 
+void mergeClusters(std::vector<std::string> &fileNames);
+
 #endif

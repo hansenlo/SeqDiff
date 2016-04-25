@@ -19,6 +19,8 @@ using std::list;
 using std::make_shared;
 using std::unordered_map;
 using std::bitset;
+using std::tuple;
+using std::get;
 
 
 inline void countKmers(sparse_hash_map<uint_fast64_t, int, customHash> &controlKmers, char nextLineFlag, string inputFile, int kmerSize)
@@ -904,7 +906,7 @@ void readUniqueKmers(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqueKm
 	}
   
       //checking to make sure kmer is counted enough times
-      if(kmerCtr<ctrCutoff || kmerCtr>=255)
+      if(kmerCtr<ctrCutoff || kmerCtr>=2000)
 	{
 	  continue;
 	}
@@ -1076,12 +1078,9 @@ void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_
   long j;
 
 
-
   //print out every read and the cluster it belongs to
   for(j=0; j<clusterBuffer.size(); j++)
     {
-
-
 
       //clusterFiles[stoull(clusterBuffer[j][1])]
 			  
@@ -1091,7 +1090,7 @@ void printClusters(vector< vector<string> > &clusterBuffer, dense_hash_map<uint_
       //the vector files contains a set of ofstream pointers to different file output objects
 #pragma omp critical(PRINT_ALL_UNIQUE_READS)
       {
-	*(files[clusterFiles[stoull(clusterBuffer[j][1])]])<<clusterBuffer[j][0]<<"\t"<<clusterBuffer[j][1]<<"\t"<<qualityBuffer[j]<<"\t"<<qualityStringBuffer[j]<<endl;
+	*(files[clusterFiles[stoull(clusterBuffer[j][1])]])<<clusterBuffer[j][0]<<"\t"<<clusterBuffer[j][1]<<"\t"<<clusterBuffer[j][2]<<"\t"<<qualityBuffer[j]<<"\t"<<qualityStringBuffer[j]<<endl;
       }
 		 
 
@@ -1133,7 +1132,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		    dense_hash_map<std::bitset<bitSetSize>, uint_fast32_t, stdHash> &clusterKmers, //hash table key is kmer value is the cluster that kmer belongs to
 		    dense_hash_map<uint_fast32_t, int, stdHash> &clusterFiles,  //hash table key is a cluster id value is the index into the vector of output file names
 		    vector<std::shared_ptr<ofstream> > &files, //set of opened file handlers that clusters will be written to
-		    dense_hash_map<std::bitset<bitSetSize>, int, stdHash>  &uniqueKmers, //hash table key is a kmer that is unqiue to the exp read library value is the number of times kmer occurs in experiment read library
+		    dense_hash_map<std::bitset<bitSetSize>, int, stdHash>  &uniqueKmers, //hash table key is a kmer that is unique to the exp read library value is the number of times kmer occurs in experiment read library
 		    ofstream &uniqueOut, //ofstream object file handler contains location of output file for all unique reads
 		    int kmerSize, //kmer size
 		    int numFiles, //number of files to print clusters to
@@ -1146,7 +1145,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
   string line, header, tempLine;
   char continueFlag, start;
   long ctr, i, revControlValue, controlValue, kmerCounter, j, NCtr, k;
-  long totalCtr, startFirstKmer, startSecondKmer, lineCtr, limit;
+  long totalCtr, startFirstKmer, startSecondKmer, lineCtr, limit, maxCount;
   bool fastq, flag, secondTime, usedRead, presentCluster, foundCluster, isUnique;
   uint_fast64_t index, tempKey, posKey, negKey, first, middle, end, positionCtr;
   uint_fast64_t lastKey, clusterIndex, randomFileIndex, tempValue;
@@ -1165,6 +1164,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
   bitset<bitSetSize> key, AbitString, CbitString, GbitString, TbitString, reversedKey, firstKey, secondKey, currentUniqueKey;
   
+  maxCount=0;
 
 
   //creating a vector of vectors to hold the set of reads that belong to a cluster
@@ -1233,9 +1233,6 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
     {
 
 
-
-
-
       //if sequence does not continue on the next line reset all values to zero 
       //since sequence on next line is unrelated to current sequence
       if(continueFlag=='0')
@@ -1253,6 +1250,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
       kmerCounter=0;
       NCtr=0;
       distanceFirstKey=0;
+      maxCount=0;
       bool goodQuality=true; //variable to keep track of whether or not the unique kmer contains a low quality base
 
       //cerr<<"line is "<<line<<endl;
@@ -1267,7 +1265,6 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 	  //secondKey=reversedKey;
 	  //startSecondKmer=i+1;
-
 
 
 	   //if character is not a nucleotide reset the bit string and start over
@@ -1372,29 +1369,40 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 	      	
 	      if(iter!=uniqueKmers.end() || revIter!=uniqueKmers.end() )
-	      {
-
-		
-
-
+		{
 
 		//if count of unique kmers is less than the cutoff
-		if(iter->second < 5 && revIter->second < 5)
-		  {
-		    continue;
-		  }
+		  if(iter->second < 5 && revIter->second < 5)
+		    {
+		      continue;
+		    }
 
 
 		  //if any unique kmer is larger than the cutoff do not use that read
 		  if(iter->second > 254 || revIter->second > 254)
-		  {
+		    {
 		    
-
-		    break;
-		  }
+		      break;
+		    }
 
 		 
+		  //getting the unique kmer with the highest count 
+		  if(iter!=uniqueKmers.end())
+		    {
+		      if(maxCount<uniqueKmers[key])
+			{
+			  maxCount=uniqueKmers[key];
+			}
+		    }else if(revIter!=uniqueKmers.end())
+		    {
+		      if(maxCount<uniqueKmers[reversedKey])
+			{
+			  maxCount=uniqueKmers[reversedKey];
+			}
+		    }
+		  
 
+		
                  
 		  
 		  //if clusterBuffer reaches the maximum size then output each read sequence to the correct 
@@ -1605,7 +1613,9 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 			  //adding a new line to the existing buffer that holds cluster reads
 			  qualityStringBuffer.push_back(workNodePtr->qualityScores[j]);
-			  clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterIndex)} );
+
+			  //storing the first and last unique word found in the read
+			  clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterIndex), to_string(maxCount)} );
 		     
 		      //if first word not already in cluster then add it
 			  //do not have to worry about last word since last word is  the current word 
@@ -1693,7 +1703,16 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 
 			  //adding a new line to the existing cluster
-			  clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterIndex)} );
+			  //clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterIndex)} );
+			  //string revFirstKey=bit2String(firstKey, kmerSize);
+			  //string revLastKey=bit2String(currentUniqueKey, kmerSize);
+
+			  //revComplement(revFirstKey);
+			  //revComplement(revLastKey);
+
+			  clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterIndex), to_string(maxCount) } );
+
+
 			  qualityStringBuffer.push_back(workNodePtr->qualityScores[j] );
 			  
 			  
@@ -1887,8 +1906,8 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			  }
 
 
-			  
-			clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterCtr)} );
+			clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterIndex), to_string(maxCount) } );
+			//clusterBuffer.push_back(vector<string>{workNodePtr->chunk[j], to_string(clusterCtr)} );
 			qualityStringBuffer.push_back(workNodePtr->qualityScores[j]);
 			  
 
@@ -2013,7 +2032,6 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
   clusterKmers.set_empty_key(-20);
 
 
-
   
   //sparse_hash_map<uint_fast64_t, vector<string>, customHash> clusterBuffer(100000); //hash table to temporarily store a set of sequences and the cluster they belong to
  
@@ -2027,7 +2045,6 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
   //creating a vector to act as a buffer to hold reads that contain a unique word
   vector< string > uniqueReadsBuffer;
   clusterBuffer.reserve(100000);
-
 
 
 //will periodically be flushed to a set of output files key is cluster id value is sequence
@@ -2446,11 +2463,11 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 {
   
   ifstream clusterFile;
-  string line, clusterIdentifier, qualityFlag, qualityString, read;
+  string line, clusterIdentifier, qualityFlag, qualityString, read, stringMaxCount;
   uint_fast64_t clusterID, i;
   // ReadCluster cluster;
-  long quality;
-
+  long quality, maxCount;
+  
   const int maxBufferSize=50000;
 
   vector<string> contigBuffer; //holds the set of assembled contigs will write them to a file when they get to large
@@ -2495,6 +2512,10 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
 	dense_hash_map<uint_fast64_t, long, customHash> qualityCtrs; //hash table key is cluster ID value is a ctr represening the sum of the quality flags will sum up number of reads whose unique kmer contains no poor quality bases
 	qualityCtrs.set_empty_key(-20);
+
+	dense_hash_map<uint_fast64_t, long, customHash> maxCounts; //hash table key is cluster ID value is a ctr represening the sum of the quality flags will sum up number of reads whose unique kmer contains no poor quality bases
+	maxCounts.set_empty_key(-20);
+
 	
 	
 
@@ -2518,7 +2539,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	  istringstream iss(line);
       
       //can parse string this way because words seperated by spaces
-	  iss>>read>>clusterIdentifier>>qualityFlag>>qualityString;
+	  iss>>read>>clusterIdentifier>>stringMaxCount>>qualityFlag>>qualityString;
 	  
 
 
@@ -2528,7 +2549,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	  
 	  quality=stoull(qualityFlag, NULL, 10); //storing the quality
 
-	  
+	  maxCount=stoull(stringMaxCount, NULL, 10);
 
 
       //check to see if cluster already exists in hash table
@@ -2549,6 +2570,13 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	     
 	      qualityCtrs[clusterID]=qualityCtrs[clusterID]+quality; //keeping track of the number of reads with high quality bases close to the unique word(s)
 
+	      if(maxCount > maxCounts[clusterID])
+		{
+		  
+		  maxCounts[clusterID]=maxCount;
+
+		}
+	      
 
 	    }else
 	    {
@@ -2559,6 +2587,9 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
 	      clusters[clusterID]=new unordered_map<string, string>; //adding a new hash table to hold the read sequence and quality string for the read	     
 	      (*clusters[clusterID])[read]=qualityString; //adding the matching quality string to the inner hash table
+	    
+	      maxCounts[clusterID]=maxCount; //keeping track of the max unique word counts for each cluster
+
 	    }
 
 
@@ -2589,8 +2620,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
       for(iter; iter!=clusters.end(); iter++)
 	{
 
-	  //cout<<"size of cluster "<<iter->first<<" is "<<iter->second->size()<<endl;
-	 
+	  //cout<<"size of cluster "<<iter->first<<" is "<<iter->second->size()<<endl;	 
 
 	  ratio=(double(qualityCtrs[iter->first])/iter->second->size());
 	  //cout<<ratio<<endl;
@@ -2601,6 +2631,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	      continue;
 	    }
 
+	  maxCount=maxCounts[iter->first]; //getting the max unique word count for this cluster
 	 
 
 	  //deduplicating reads
@@ -2641,20 +2672,31 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 		 
 
 		  //cluster.printStartPositions();
-		 
-	      string contig=cluster.mergeReads(clusterKmerSize, 2, debuggingMatrix, iter->first);
+
+	      vector<string> ids;
+	      ids.push_back(to_string(iter->first));
+	      vector<string> contigs;
+	      cluster.mergeReads(contigs, clusterKmerSize, 2, debuggingMatrix, ids);
 
 		 
+	      
+					
+	      //string contig="AAAAAAA";
 
-													//string contig="AAAAAAA";
-
-	      if(contig.compare("0")!=0) //if a valid contig i.e. not equal to 0 then add it to the clusterBuffer
-		{
+	      for(int j=0; j<contigs.size(); j++)
+		{	      
+		  if(contigs[j].compare("0")!=0) //if a valid contig i.e. not equal to 0 then add it to the clusterBuffer
+		    {
 		      //cout<<contig<<endl;
-		  contigIDs.push_back(to_string(iter->first)+"_"+to_string(iter->second->size()));
-		  contigBuffer.push_back(contig);
-		}
+		      //contigIDs.push_back(ids[j]+"_"+to_string(iter->second->size()));
+		      
+		      contigIDs.push_back(ids[j]+"_"+to_string(maxCount));
+		      contigBuffer.push_back(contigs[j]);
+		    }
 		  
+		}
+	      
+
 		  //cout<<bit2String(pair.first, clusterKmerSize)<<endl;
 		  
 		  //temp++;
@@ -2742,4 +2784,265 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
       
       
+}
+
+void mergeClusters(vector<string> &fileNames)
+{
+
+  int j;
+
+  ifstream clusterFile;
+  string line, clusterIdentifier, qualityFlag, qualityString, read, word1, word2;
+  uint_fast64_t clusterID, i;
+  // ReadCluster cluster;
+  long quality;
+
+  
+
+  
+
+  
+  //unordered_map<uint_fast64_t, vector<int>> qualityScores; //hash table key is cluster ID value is a ctr represening the sum of the quality flags will sum up number of reads whose unique kmer contains no poor quality bases
+  //	qualityCtrs.set_empty_key(-20);
+	
+	
+
+
+  for(i=0; i<fileNames.size(); i++)
+    {
+      ifstream clusterFile;
+  
+      unordered_map<string, vector<string> > clusterOne; //hash table key is a string representing one of the unique words found in the read value is a vector of strings representing in order, ClusterID, read, quality string, quality flag
+
+      //reading in the clusters from the first file
+      clusterFile.open(fileNames[i].c_str(), ifstream::in);
+      if(!clusterFile.is_open())
+	{
+	  cerr<<"could not open file "<<fileNames[i]<< " check to see if exists"<<endl;
+	  exit(EXIT_FAILURE);
+	}
+            
+
+      while(clusterFile.good())  //read in all the clusters
+	{
+      
+	  
+	  getline(clusterFile, line);
+        
+	  //object will convert string to a stream so can use things like getline on it
+	  istringstream iss(line);
+      
+      //can parse string this way because words seperated by spaces
+	  iss>>read>>clusterIdentifier>>word1>>word2>>qualityFlag>>qualityString;
+	  
+
+
+	 
+      //convert from string into and integer
+	  //clusterID=stoull(clusterIdentifier, NULL, 10);
+	  
+	  //quality=stoull(qualityFlag, NULL, 10); //storing the quality
+
+	  
+
+	  //adding a new line to the hash table
+	  clusterOne[word1].push_back(clusterIdentifier);
+	  clusterOne[word1].push_back(read);
+	  clusterOne[word1].push_back(qualityString);
+	  clusterOne[word1].push_back(qualityFlag);
+
+	  /*
+	  clusterOne[word2].push_back(clusterIdentifier);
+	  clusterOne[word2].push_back(read);
+	  clusterOne[word2].push_back(qualityString);
+	  clusterOne[word2].push_back(qualityFlag);
+	  */
+
+
+	}
+    
+      
+      clusterFile.close();
+
+
+    
+
+      for(j=(i+1); j<fileNames.size(); j++)
+	{
+	  unordered_map<string, vector< tuple<string, string, string, string, string> > > clusterTwo; //hash table key is the cluster id value is a vector of tubles the value for the tuple is in order read, quality string, quality flag, word1, word2
+	  //this hash table will store clusters from the second file which will be compared to the clusters from the first file
+
+
+	  cerr<<"merging "<<fileNames[i]<<" with "<<fileNames[j]<<endl;
+	  //clusterTwo.clear(); //clearing the previous set of clusters
+	 
+	  ifstream clusterFile2;
+	  
+	   //reading in the clusters from the first file
+	  clusterFile2.open(fileNames[j].c_str(), ifstream::in);
+	  if(!clusterFile2.is_open())
+	    {
+	      cerr<<"could not open file "<<fileNames[j]<< " check to see if exists"<<endl;
+	      exit(EXIT_FAILURE);
+	    }
+            	  
+	  while(clusterFile2.good())  //read in all the clusters
+	    {
+      
+	      getline(clusterFile2, line);
+        
+	  //object will convert string to a stream so can use things like getline on it
+	      istringstream iss(line);
+      
+      //can parse string this way because words seperated by spaces
+	      iss>>read>>clusterIdentifier>>word1>>word2>>qualityFlag>>qualityString;
+	      
+	
+	      clusterTwo[clusterIdentifier].push_back(make_tuple(read, qualityString, qualityFlag, word1, word2));
+
+	    }
+
+	  clusterFile2.close();
+
+
+	  //comparing and merging the two clusters
+	  auto clusterTwoIter=clusterTwo.begin();
+
+	  // cerr<<"end of getting cluster 2 "<<endl;
+	  for(clusterTwoIter; clusterTwoIter!=clusterTwo.end(); clusterTwoIter++)
+	    {
+
+
+	      int z;
+	      bool inCluster=false;
+	      bool revComp=false;
+
+	      //go through each clusters set of reads and unique words
+	      for(z=0; z<clusterTwoIter->second.size(); z++)
+		{
+		  word1=get<3>(clusterTwoIter->second.at(z));
+		  //word2=get<4>(clusterTwoIter->second.at(z));
+
+		  //checking to see if reads from 2nd cluster match first cluster
+		  //if( (clusterOne.count(word1) > 0) || (clusterOne.count(word2) > 0))
+		    
+		  if( (clusterOne.count(word1) > 0))
+		    {
+		      inCluster=true;
+		      break;
+		    }
+
+
+		  //checking for reverse complement
+		  revComplement(word1);
+		  //revComplement(word2);
+		  //if( (clusterOne.count(word1) > 0) || (clusterOne.count(word2) > 0))
+		  if( (clusterOne.count(word1) > 0))  
+		    {
+		      inCluster=true;
+		      revComp=true;
+		      break;
+		    }
+		  
+
+		}
+
+	      if(inCluster) //if is in cluster than add to the current cluster
+		{
+		  if(!revComp)
+		    {
+		      //adding 2nd cluster to first cluster
+		      for(z=0; z<clusterTwoIter->second.size(); z++)
+			{
+
+			  //clusterTwo[clusterIdentifier].push_back(make_tuple(read, qualityString, qualityFlag, word1, word2));
+
+
+
+			  //iss>>read>>clusterIdentifier>>word1>>word2>>qualityFlag>>qualityString;
+
+	 
+			  //adding a new line to the hash table for each read in cluster 2
+			  clusterOne[word1].push_back(clusterOne[word1][0]); //changing the cluster identifer to match the one in cluster one
+			  clusterOne[word1].push_back(get<0>(clusterTwoIter->second.at(z))); //adding the read
+			  clusterOne[word1].push_back(get<1>(clusterTwoIter->second.at(z))); //adding the quality string
+			  clusterOne[word1].push_back(get<1>(clusterTwoIter->second.at(z))); //adding the quality flag
+
+
+
+			  
+			}
+
+		    }
+
+		  if(revComp)
+		    {
+		      //adding 2nd cluster to first cluster
+		      for(z=0; z<clusterTwoIter->second.size(); z++)
+			{
+
+			  //clusterTwo[clusterIdentifier].push_back(make_tuple(read, qualityString, qualityFlag, word1, word2));
+
+
+
+			  //iss>>read>>clusterIdentifier>>word1>>word2>>qualityFlag>>qualityString;
+
+			  string revRead=get<0>(clusterTwoIter->second.at(z));
+			  revComplement(revRead); //reverse Complementing the read
+			  string revQualityString=get<1>(clusterTwoIter->second.at(z));
+
+			  std::reverse(revQualityString.begin(), revQualityString.end()); //reverse the quality scores
+
+			  //adding a new line to the hash table for each read in cluster 2
+			  clusterOne[word1].push_back(clusterOne[word1][0]); //changing the cluster identifer to match the one in cluster one
+			  clusterOne[word1].push_back(revRead); //adding the read
+			  clusterOne[word1].push_back(revQualityString); //adding the quality string
+			  clusterOne[word1].push_back(get<1>(clusterTwoIter->second.at(z))); //adding the quality flag
+
+			  
+			}
+
+		    }
+
+
+
+
+
+
+		}
+	      
+	    
+	 
+	    }
+  
+      
+
+	}
+
+      //writing the new merged set of clusters to a file
+	  ofstream clusterFileOut;
+	  clusterFileOut.open(fileNames[i].c_str(), ios::trunc); //open the file to put merged clusters back into it
+
+	  if(!clusterFileOut.is_open())
+	    {
+	      cerr<<"could not open file "<<fileNames[i]<< " check to see if exists"<<endl;
+	      exit(EXIT_FAILURE);
+	    }
+    
+	  auto clusterOneIter=clusterOne.begin();
+	  // cerr<<"end of getting cluster 2 "<<endl;
+	  for(clusterOneIter; clusterOneIter!=clusterOne.end(); clusterOneIter++)
+	    {
+
+	      //iss>>read>>clusterIdentifier>>word1>>word2>>qualityFlag>>qualityString;
+	  
+	      clusterFileOut<<clusterOneIter->second.at(1)<<"\t"<<clusterOneIter->second.at(0)<<"\t"<<clusterOneIter->second.at(3)<<"\t"<<clusterOneIter->second.at(2)<<endl;
+
+	    }
+
+
+
+    }
+
+
 }

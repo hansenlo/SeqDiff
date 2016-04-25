@@ -123,7 +123,7 @@ system($cmd)==0
 
 
 #copying sequence to appropriate places
-if(1==1)
+if(1==2)
 {
 #move contigs to appropriate directory
 $cmd="cp /home/hansenlo/SeqDiff/gitHubProject/SeqDiff/contigs.fa /data5/SeqDiffResults/Results/".$header."_contigs.fasta";
@@ -291,7 +291,7 @@ system($cmd)==0
 }
 
 
-if(1==2)
+if(1==1)
 {
 
 

@@ -23,10 +23,33 @@
 #include<list>
 #include <unordered_map>
 #include <functional>
-
+#include <tuple>
 
 #include "utilities.h"
 
+
+
+// C++ program to print DFS traversal from a given vertex in a  given graph
+ 
+// Graph class represents a directed graph using adjacency list representation
+class Graph
+{
+  //int V;    // No. of vertices
+    //std::list<int> *adj;    // Pointer to an array containing adjacency lists
+    std::vector<std::list<int>> graph;
+
+    void DFSUtil(int v, std::vector<bool> &visited, std::vector<int> &cluster);  // A function used by DFS
+public:
+ Graph(int V):graph(V){}// Constructor build a graph with a known number of vertices
+    void addEdge(int v, int w);   // function to add an edge to graph
+    void DFS(int v, std::vector<int> &cluster, std::vector<bool> &visited);    // DFS traversal of the vertices reachable from v
+    void addVertex() //adding a new vertex if necassary
+    {      
+      std::list<int> temp; //adding a new vertex
+      graph.push_back(temp);
+    }
+};
+ 
 
 
 class ReadCluster{
@@ -55,7 +78,7 @@ public:
   std::string getContig();
   void printReads();
   std::vector< google::dense_hash_map<uint_fast64_t, long, customHash> >& getPositions(){ return kmerPositions;}; 
-  std::string mergeReads(int kmerSize, int cutoffMinNuc, std::ofstream &debugging, long clusterID); //kmerSize is the size of the kmers cutoffMinNuc is the minimum number of nucleotides in a column to call a base debugging and cluster ID are purely for debugging purposes.  
+  void mergeReads(std::vector<std::string> &contigs, int kmerSize, int cutoffMinNuc, std::ofstream &debugging, std::vector<std::string> &clusterID); //kmerSize is the size of the kmers cutoffMinNuc is the minimum number of nucleotides in a column to call a base debugging and cluster ID are purely for debugging purposes.  
 
   //void addSequences(google::dense_hash_map<std::string, int, customHash> *); //function to add a vector of reads
 
@@ -71,11 +94,56 @@ public:
   void printStartPositions();
   //void setUsedReadsFalse(); //will set the vector of usedReads all to false using the member variable clusterKmerSize if clusterKmerSize is not defined will throw an error
   
-  uint_fast64_t numberDiff(std::vector<std::vector<char>> &alignmentMatrix, int row1, int row2, int start1, int start2, int &sizeAligned); //Given the alignment matrix of reads and the row index and start positition of the 2 reads calculate percent difference of the 2 reads for the aligned regions sizeAligned is the number of aligned bases between the 2 reads the aligned bases may not necassarily match
+  uint_fast64_t numberDiff(std::vector<std::vector<char>> &alignmentMatrix, int row1, int row2, int start1, int start2, int &sizeAligned, int readSize); //Given the alignment matrix of reads and the row index and start positition of the 2 reads calculate percent difference of the 2 reads for the aligned regions sizeAligned is the number of aligned bases between the 2 reads the aligned bases may not necassarily match
+
+  std::string assembleContig(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, double &nucCtr, double &badColCtr, int cutoffMinNuc, double &Nctr); //given a matrix of aligned reads merge the columns into a contig also provided is a vector of rows that should 
+  //be used in the assembly rows indexes not listed in the vector will be ignored
+
+  void getDistanceGraph(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &startMatrix, Graph &numMatches, int readSize); //given an alignment matrix return the matrix of distances between pairs of reads startMatrix is the start position of each read in the alignment matrix
+
+  void getSubClusters(std::vector<std::vector<int>> &numMatches, std::vector<std::vector<int>> &clusters);
+
+
+  //debugging function only will print the alignment Matrix for the set of rows passed to it 
+  void printMatrix(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, double &percentBadCol, std::string &clusterID, std::ofstream &debugging); 
+
+
+//function to check the quality of the assembled contig returns through the parameter 
+  //list several different metrics of how well the assembly worked
+  void checkContig(std::string &combinedNuc, int readSize, double &badColCtr, double &Nctr, double &percentBadCol, double &percentNs) 
+  {                                                                               
+
+    percentBadCol=(badColCtr/combinedNuc.length());
+    percentNs=(Nctr/combinedNuc.length());
+
+ 
+    if(combinedNuc.length() < (readSize/2)) //if contig to short throw it out
+      {
+	combinedNuc="0";
+      }
+
+    if(percentBadCol > 0.1) //if to many bad columns throw it out
+      {
+	combinedNuc="0";
+      }
+
+  //if number of not confident nucleotide calls is greater than 10% of the contig throw it out
+    if(percentNs > 0.1)
+      {
+	combinedNuc="0";
+      }
+  
+
+  }
+
+
 
 };
 
 //very simple compare function to pass to sort in order to sort pairs by the second element
 bool comparePairs(const std::pair<uint_fast64_t, long>&i, const std::pair<uint_fast64_t, long>&j);
 
+
 #endif
+
+

@@ -1,7 +1,7 @@
 #include "utilities.h"
 
 #include <iostream>
-#include<fstream>
+//#include<fstream>
 //#include<boost/dynamic_bitset.hpp>
 
 using std::cout;
@@ -12,7 +12,7 @@ using std::ofstream;
 using std::ios;
 using std::cerr;
 using boost::dynamic_bitset;
-
+using std::ifstream;
 
 struct eqKey{
 
@@ -368,4 +368,37 @@ void revComplementBitString( std::bitset<bitSetSize> &reversedKey, std::bitset<b
   
 
 } 
+void readInFasta(std::unordered_map<std::string, std::string> &genome, string fileName)
+{
+  ifstream fasta;
+  string line;
+  string chr;
+
+  fasta.open(fileName.c_str(), ifstream::in);
+  if(!fasta.is_open())
+    {
+      cerr<<"could not open file "<<fileName<< " check to see if exists"<<endl;
+      exit(EXIT_FAILURE);
+    }
+
+      
+
+      while(fasta.good())  //read in all the clusters
+	{
+	  getline(fasta, line);
+      
+	  if(line[0]=='>')
+	    {
+	      chr=line.substr(1); 
+	      genome[chr]="";
+	    }else
+	    {
+	      genome[chr]=genome[chr].append(line);
+
+	    }
+	  
+
+	}
+
+}
 

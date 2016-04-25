@@ -26,6 +26,8 @@ sub getSNPS($ $);
 #given two strings will calculate the number of mismatches between them
 sub calculateHammingDistance($ $);
 
+#function to take as input a vcf file and merge the same variants if they meet a certain cutoff number of reads
+sub mergeVariants($ $);
 
 
 
@@ -78,6 +80,8 @@ if($flag eq 'cigar')
 {
 
     &getVar_MDstring($inputFile);
+    &mergeVariants("temp.vcf", 6);
+
 }
 
 
@@ -1327,20 +1331,36 @@ if(1==1)
 			
 			my $regionStart=$delStart-100;
 			my $regionsEnd=$delStart+100;
-			#my  $avg=`samtools mpileup -ABr $data[2]:$regionStart-$regionsEnd -d 1000000 /data7/PlatinumAlignments/allPlatium.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
-			my $avg=0.001; #temporary fix remove later
+			my $avg;
+#  $avg=`samtools mpileup -ABr $data[2]:$regionStart-$regionsEnd -d 1000000 /data7/PlatinumAlignments/allPlatium.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
+			#my $avg=0.001; #temporary fix remove later
 
 			$data[0]=~m/\_(\d+$)/;
 
 			my $numReadsInCluster=$1;
 
-			my $allelFraction=$numReadsInCluster/$avg;
+			$avg=0.0000001;
+			#my $allelFraction=$numReadsInCluster/$avg;
 			#print "$allelFraction\n";
+			
+			my $allelFraction=".";
+
+
+
+			#if(($numReadsInCluster/$avg)>0.6) #if alternative allel in cluster is greater than 50% of overall coverage call it a homozygote
+			#{	
+			    print Indels "$data[2]\t$delStart\t.\t$refSeq\t$altSeq\t.\tPASS\tContig=$data[0];Length=$size;Type=DEL;AlleleFraction=$allelFraction\tGT\t0/1\n"; 
+
+			#}else
+			#{
+			 #   print Indels "$data[2]\t$delStart\t.\t$refSeq\t$altSeq\t.\tPASS\tContig=$data[0];Length=$size;Type=DEL;AlleleFraction=$allelFraction\tGT\t0/1\n"; 
+			#}
+
 
 
 			#if(($numReadsInCluster/$avg)>0.10)
 			#{
-			    print Indels "$data[2]\t$delStart\t.\t$refSeq\t$altSeq\t.\tPASS\tContig=$data[0];Length=$size;Type=DEL;AlleleFraction=$allelFraction\tGT\t0/1\n"; #vcf format
+			 #   print Indels "$data[2]\t$delStart\t.\t$refSeq\t$altSeq\t.\tPASS\tContig=$data[0];Length=$size;Type=DEL;AlleleFraction=$allelFraction\tGT\t0/1\n"; #vcf format
 			#}
 			    
 
@@ -1372,21 +1392,33 @@ if(1==1)
 
 			my $regionStart=$insStart-100;
 			my $regionsEnd=$insStart+100;
-			#my  $avg=`samtools mpileup -ABr $data[2]:$regionStart-$regionsEnd -d 1000000 /data7/PlatinumAlignments/allPlatium.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
-			my $avg=0.001; #temporary fix remove later
+			
+			my $avg;
+#my  $avg=`samtools mpileup -ABr $data[2]:$regionStart-$regionsEnd -d 1000000 /data7/PlatinumAlignments/allPlatium.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
+			#my $avg=0.001; #temporary fix remove later
 
 
 			$data[0]=~m/\_(\d+$)/;
 
 			my $numReadsInCluster=$1;
+			
+			$avg=0.0000001;
 
-			my $allelFraction=$numReadsInCluster/$avg;
+			#my $allelFraction=$numReadsInCluster/$avg;
 			#print "$allelFraction\n";
+			my $allelFraction=".";
 
 			#if(($numReadsInCluster/$avg)>0.10)
 			#{
-			    
-			    print Indels "$data[2]\t$insStart\t.\t$refSeq\t$altSeq\t.\tPASS\tContig=$data[0];Length=$size;Type=INS;AlleleFraction=$allelFraction\tGT\t0/1\n";
+
+			 #   if(($numReadsInCluster/$avg)>0.6) #if alternative allel in cluster is greater than 50% of overall coverage call it a homozygote
+			  #  {	
+			#	print Indels "$data[2]\t$insStart\t.\t$refSeq\t$altSeq\t.\tPASS\tContig=$data[0];Length=$size;Type=INS;AlleleFraction=$allelFraction\tGT\t0/1\n";
+			 #   }else
+			  #  {
+				print Indels "$data[2]\t$insStart\t.\t$refSeq\t$altSeq\t.\tPASS\tContig=$data[0];Length=$size;Type=INS;AlleleFraction=$allelFraction\tGT\t0/1\n";
+			   # }
+
 
 			#}
 			    
@@ -1420,9 +1452,9 @@ system($cmd)==0
 
 
 #removing duplicate variant calls
-$cmd="time /data/bin/vcflib/bin/vcfuniq foo.dat > indelCalls.vcf";
-system($cmd)==0
-    or die "system $cmd failed\n";
+#$cmd="time /data/bin/vcflib/bin/vcfuniq foo.dat > indelCalls.vcf";
+#system($cmd)==0
+#    or die "system $cmd failed\n";
 
 
 if(1==2)
@@ -1446,7 +1478,6 @@ system($cmd)==0
 $cmd="cat indelCalls.vcf | vcf-sort > temp.vcf";
 system($cmd)==0
     or die "system $cmd failed\n";
-
 
 
 $cmd="bgzip -c temp.vcf > indelCalls.vcf.gz";
@@ -1536,6 +1567,333 @@ system($cmd)==0
     }    
 
 
+
+
+}
+
+#function to take as input a vcf file and merge the same variants if they meet a certain cutoff number of reads
+sub mergeVariants($ $)
+{
+    my $vcfFile=shift;
+    my $cutoff=shift;
+
+    my @vcfMatrix=&parseVCFMatrix($vcfFile);
+
+    my $rowNum=@vcfMatrix;
+
+    my ($i, $sameVarFlag, $sameVarCtr, $covCounter, $j, $sameIndex, $z, $numColumns, $size, $regionsStart, $regionsEnd);
+    my($contigID, $allelFraction);
+    
+    open(Indels, ">indelCalls.vcf");	
+
+#or $vcfMatrix[$i][7]=~m/.*Contig\=\d+\_\d+\_\d+.*/
+
+    $sameVarFlag=0;
+    $sameVarCtr=0;
+    for($i=0; $i<($rowNum-1); $i++)
+    {
+
+
+	$covCounter=0;
+	if($vcfMatrix[$i][0]=~m/^\#/ )
+	{
+
+#	    or $vcfMatrix[$i][7]=~m/.*Contig\=\d+\_\d+\_.*/
+
+	    #print Indels "$vcfMatrix[$i][0]\n"; #header lines have no tabs this should print them out in their entiriry. 
+	    $sameVarFlag=0;
+	    $sameVarCtr=0;
+  
+
+	    $size=@{$vcfMatrix[$i]};
+	    #print out one copy of the many variant duplicates
+	    for($z=0; $z<$size; $z++)
+	    {
+		if($z!=($size-1))
+		{
+		    print Indels "$vcfMatrix[$i][$z]\t";
+		}else
+		{
+		    print Indels "$vcfMatrix[$i][$z]\n"; 
+		}	
+	    }
+
+
+	    next;
+	}
+
+	if($vcfMatrix[$i][1]==9422116)
+	{
+	    my $temp=1;
+	}
+	
+
+
+
+	#checking to see if Variants are the same
+	if( ($vcfMatrix[$i][0] eq $vcfMatrix[$i+1][0] ) && ($vcfMatrix[$i][1]==$vcfMatrix[$i+1][1]) && ($vcfMatrix[$i][3] eq $vcfMatrix[$i+1][3]) && ($vcfMatrix[$i][4] eq $vcfMatrix[$i+1][4]) )
+	{
+	    $sameVarFlag=1;
+	    $sameVarCtr++;
+
+	}else
+	{
+	    if($sameVarFlag==1) #have reached the end of a stretch of similar variants
+	    {
+		$sameIndex=$i-$sameVarCtr;
+		$covCounter=0;
+		for($j=$sameIndex; $j<=($i); $j++) #sum up the count of reads for every cluster
+		{
+		    if($vcfMatrix[$j][7]=~/Contig\=\d+_(\d+)\;.*/)
+		    {
+			if($1>$covCounter)
+			{
+			    $covCounter=$1;
+
+			    #$covCounter+=$1;
+			}
+		    }
+
+		    if(!(defined($1)))
+		    {
+			my $temp=1;
+		    }
+
+		    
+
+		}
+
+		$sameVarFlag=0;
+		$sameVarCtr=0;
+		    
+
+		$regionsStart=$vcfMatrix[$sameIndex][1]-100;
+		$regionsEnd=$vcfMatrix[$sameIndex][1]+100;
+
+	
+		if($covCounter>0)
+		{
+		    my  $avg=`samtools mpileup -ABr $vcfMatrix[$sameIndex][0]:$regionsStart-$regionsEnd -d 1000000 /data7/PlatinumAlignments/allPlatium.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
+
+		     $allelFraction=$covCounter/$avg;
+		}else #if all the variants that make the same call come from an impure cluster than do not attempt to make any zygousity calls or allelfraction calculations
+		{
+		    	for($z=0; $z<$size; $z++)
+			{
+			    if($z!=($size-1))
+			    {
+				print Indels "$vcfMatrix[$sameIndex][$z]\t";
+			    }else
+			    {
+				print Indels "$vcfMatrix[$sameIndex][$z]\n"; 
+			    }	
+			}
+
+			next;
+
+
+		    $allelFraction=-1;
+		}
+
+
+		#print "$allelFraction\n";
+
+		#if($allelFraction>1)
+		#{
+		 #   my $temp=1;
+		#}
+
+
+		if($covCounter < $cutoff && $covCounter > 0 ) #not enough reads in cluster to meet the minimum coverage
+		{
+		    $sameVarFlag=0;
+		    $sameVarCtr=0;
+		    next;
+		}
+
+	
+		
+		if($allelFraction > 0.10) #remove any low allel fraction variants
+		{
+		    $vcfMatrix[$sameIndex][7]=~/Contig\=(\d+)_\d+/;
+		    $contigID=$1;
+
+		    if(!(defined($contigID)))
+		    {
+			my $temp=1;
+		    }
+
+			#replacing old allel faction and count of reads in the contig with the new counts
+		    $vcfMatrix[$sameIndex][7]=~s/Contig\=\d+_\d+/Contig\=$contigID\_$covCounter/;	
+		    $vcfMatrix[$sameIndex][7]=~s/AlleleFraction=\./AlleleFraction=$allelFraction/;
+
+
+
+		    if($allelFraction>0.5) #if alternative allel in cluster is greater than 50% of overall coverage call it a homozygote
+		    {	
+			$size=@{$vcfMatrix[$sameIndex]};
+			
+			#print out one copy of the many variant duplicates
+			for($z=0; $z<$size; $z++)
+			{
+			    if($z!=9)
+			    {
+				print Indels "$vcfMatrix[$sameIndex][$z]\t";
+			    }
+
+			    if($z==9) #reached genotype field
+			    {
+				print Indels "1/1\n"; 
+			    }
+			
+			}
+		    }else
+		    {
+		
+			#heterozygout
+			$size=@{$vcfMatrix[$sameIndex]};
+			#print out one copy of the many variant duplicates
+			for($z=0; $z<$size; $z++)
+			{
+			    if($z!=9)
+			    {
+				print Indels "$vcfMatrix[$sameIndex][$z]\t";
+			    }
+
+			    if($z==9) #reached genotype field
+			    {
+				print Indels "0/1\n"; 
+			    }
+			
+			}
+			
+		       
+		    }
+
+
+		}
+			    
+
+
+	    }else
+	    {
+		
+		##if only have one cluster that calls the variant make a decision on the basis of the the read count for that cluster
+				
+
+		    if($vcfMatrix[$i][7]=~/Contig\=\d+_(\d+)\;.*/)
+		    {
+			$covCounter=$1;
+
+			$regionsStart=$vcfMatrix[$i][1]-100;
+			$regionsEnd=$vcfMatrix[$i][1]+100;
+
+
+			my  $avg=`samtools mpileup -ABr $vcfMatrix[$i][0]:$regionsStart-$regionsEnd -d 1000000 /data7/PlatinumAlignments/allPlatium.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
+			my $allelFraction=$covCounter/$avg;
+			#print "$allelFraction\n";
+
+		    
+
+
+			if($covCounter < $cutoff) #not enough reads in cluster to meet the minimum coverage
+			{
+			    $sameVarFlag=0;
+			    $sameVarCtr=0;
+			    next;
+			}
+
+
+
+
+			if(($covCounter/$avg)>0.10) #remove any low allel fraction variants
+			{
+			    $vcfMatrix[$i][7]=~m/Contig\=(\d+)_\d+/;
+			    $contigID=$1;
+
+			#replacing old allel faction and count of reads in the contig with the new counts
+			    $vcfMatrix[$i][7]=~s/Contig\=\d+_\d+/Contig\=$contigID\_$covCounter/;	
+			    $vcfMatrix[$i][7]=~s/AlleleFraction=\./AlleleFraction=$allelFraction/;
+
+
+
+
+	
+			    if(($covCounter/$avg)>0.5) #if alternative allel in cluster is greater than 50% of overall coverage call it a homozygote
+			    {	
+				$size=@{$vcfMatrix[$i]};
+				#print out one copy of the many variant duplicates
+				for($z=0; $z<$size; $z++)
+				{
+				    if($z!=9)
+				    {
+					print Indels "$vcfMatrix[$i][$z]\t";
+				    }
+
+				    if($z==9) #reached genotype field
+				    {
+				    	print Indels "1/1\n"; 
+				    }
+			
+				}
+			    }else
+			    {
+		
+			#heterozygout
+				$size=@{$vcfMatrix[$i]};
+			#print out one copy of the many variant duplicates
+				for($z=0; $z<$size; $z++)
+				{
+				    if($z!=9)
+				    {
+					print Indels "$vcfMatrix[$i][$z]\t";
+				    }
+
+				    if($z==9) #reached genotype field
+				    {
+					print Indels "0/1\n"; 
+				    }
+			
+				}
+			
+		       
+			    }
+
+			
+
+		    
+
+			}
+
+		    }else #if variant is derived from a impure cluster do not attempt to make a zygosity call 
+		    {
+			for($z=0; $z<$size; $z++)
+			{
+			    if($z!=($size-1))
+			    {
+				print Indels "$vcfMatrix[$i][$z]\t";
+			    }else
+			    {
+				print Indels "$vcfMatrix[$i][$z]\n"; 
+			    }	
+			}
+
+
+
+		    }
+
+
+	    }
+
+	}
+
+
+
+    }
+   
+    
+    
+    close(Indels);
 
 
 }

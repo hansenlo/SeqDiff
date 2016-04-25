@@ -9,13 +9,22 @@
 #include<iostream>
 
 
+#include<sparsehash/sparse_hash_map>
+#include<sparsehash/dense_hash_map>
+
+
 //#define BOOST_DYNAMIC_BITSET_DONT_USE_FRIENDS
 
 #include<bitset>
 #include <functional>
 
+#include <unordered_map>
+
 #include<boost/dynamic_bitset.hpp>
 //#include <boost/functional/hash.hpp>
+
+#include<fstream>
+
 
 const int bitSetSize=192; //the size of bitset objects for the entire program
 
@@ -96,6 +105,14 @@ void createBitRevTable(int word, std::vector< std::bitset<bitSetSize> > &bitTabl
 
 void revComplementBitString(std::bitset<bitSetSize> &reversedKey, std::bitset<bitSetSize> &key, std::bitset<bitSetSize> &clearbitWord, std::vector< std::bitset<bitSetSize> > &bitTable, int bitWordSize, int kmerSize);
 
+
+void readInFasta(std::unordered_map<std::string, std::string> &genome, std::string fileName); //function to read in a multi fasta file and store it in a hash table
+
+//given a hash table of unique words 
+//a file containing assembled contigs 
+//return a hash table where the key is the contig id and value is the four words whose counts need to be looked up the first two words are the two unique words coming from either side of the contig
+//the next two words are the corresponding words that match the reference i.e. one bp further out from the unique words
+void getUniqueWordsContigs(google::dense_hash_map<std::bitset<bitSetSize>, int, stdHash>  &uniqueKmers, std::string contigFile, std::unordered_map<uint_fast64_t, std::vector< std::bitset<bitSetSize> >, stdHash> &pairedUniqueKmers);
 
 
 #endif
