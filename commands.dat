@@ -1,5 +1,11 @@
  time perl runJob_BitString.pl /data3/GenomeInABottle/chr21_notAligned.fastq /data3/GenomeInABottle/chr21_notAligned_refSubtracted_humanReadable_notQualityFiltered.dat
 
+time perl runJob_BitString_BWA.pl /data7/PlatinumAlignments/platinumChr21_plusUnmapped.fastq /data7/PlatinumAlignments/platinumChr21_plusUnmapped_kmerCounts_RefSubtracted_45k_database_human_Readable.dat
+
+
+grep -n -A 1 -B 1 15606023 /data3/GenomeInABottle/NISTIntegratedCalls_14datasets_131103_allcall_UGHapMerge_HetHomVarPASS_VQSRv2.19_2mindatasets_5minYesNoRatio_all_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs.vcf
+
+grep -A 8 -B 4 15513707  allCalls_merged_BWA.vcf
 
 #--vcf-score-field=Nothing is to turn off the ROC thresholding calculation
 
@@ -10,3 +16,18 @@ time /data/bin/rtg-tools-3.6.1/rtg vcfeval --calls=/home/hansenlo/SeqDiff/IndelC
 sed -e 's/chr//' fn.vcf | awk '{OFS="\t"; if (!/^#/){print $1,$2-1,$2,$4"/"$5,"+"}}' > fn.bed
 
 time perl ../evaluateVariants.pl tp.vcf fp.vcf /data3/GenomeInABottle/allIndels_only_NIST_v2.19.recode_withChr.vcf
+
+make -f Makefile_Zygosity
+
+bgzip -c test_bowtie.vcf > test_bowtie.vcf.gz
+
+tabix -p vcf test_bowtie.vcf.gz
+
+time perl VariantPerlScripts.pl /data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs.sorted.unique.bam 1 1 cigar
+
+#command to sort only by the fourth column
+sort -s -n -k 4,4 extendedContigEdges.bed  > temp.dat 
+
+#command to add chr to first line of a file
+sed -e 's/^/chr/' file
+

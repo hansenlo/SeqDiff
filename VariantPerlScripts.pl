@@ -20,6 +20,12 @@ sub extractFasta($ $);
 sub filterContigs($ $ $);
 
 
+#given a file contianing the alignment for the ends of contigs  find contigs in which the aligned start and end positions are very different 
+#than what they should be input is file name containing aligned ends of contigs in bed format and an integer representing 
+#how different aligned start and end positions should differ
+sub filterContigsVer2($ $ $);
+
+
 #given a file containing the alignment of contigs find the SNP in the contig sequence and report location and SNP
 sub getSNPS($ $);
 
@@ -27,8 +33,13 @@ sub getSNPS($ $);
 sub calculateHammingDistance($ $);
 
 #function to take as input a vcf file and merge the same variants if they meet a certain cutoff number of reads
-sub mergeVariants($ $);
+#last argument is the name of the file to print merged calls to 
+sub mergeVariants($ $ $);
 
+#annoying have to do this because contig names are non standard
+#will remove everything but the first number in the contig id and 
+#this is what will be use as the key
+sub readFastaContig($);
 
 
 #given a Sam file identify SNPS insertions and deletions
@@ -57,7 +68,12 @@ my $flag=shift;
 
 if($flag eq 'filter')
 {
-    &filterContigs($inputFile, $contigSeq, $cutoff);
+
+
+    &filterContigsVer2($inputFile, $contigSeq, $cutoff);
+
+
+    #&filterContigs($inputFile, $contigSeq, $cutoff);
 
     #&getSNPS_MDstring($inputFile);
 }
@@ -80,7 +96,13 @@ if($flag eq 'cigar')
 {
 
     &getVar_MDstring($inputFile);
-    &mergeVariants("temp.vcf", 6);
+
+    #merging indels
+    &mergeVariants("temp.vcf", 6, "mergedIndels.vcf");
+
+    #merging Snps
+    &mergeVariants("temp2.vcf", 6,"mergedSNPs.vcf");
+
 
 }
 
@@ -170,15 +192,15 @@ sub filterContigs($ $ $)
     @regions=&parseBedfile($contigsBed);
 
     #human
-    #%refSeq=&readFasta("/data/HumanGenomeHg19/allChrHg19.fa");
+    %refSeq=&readFasta("/data/Genomes/human19/allChrhg19InOrder.fa");
 
     #worm
     #%refSeq=&readFasta("/home/gabdank/AF_SOL_490/elegans.genome.fa");
-    %refSeq=&readFasta("/data6/Genomes/cElegans10/allChr.fa");
+    #%refSeq=&readFasta("/data6/Genomes/cElegans10/allChr.fa");
 
 
 
-    %contigSeqs=&readFasta($seq);
+    %contigSeqs=&readFastaContig($seq);
 
 
     $numContigs=@regions;
@@ -229,7 +251,17 @@ sub filterContigs($ $ $)
 	$contigID=$1;
 	$size=$2;
 
+	$contigID=~m/^(\d+)\_/;
+
+	$contigID=$1;
+ 
+#	my $numUnderscore = ($contigID =~ tr/\_//); #counting the number of matches for and underscore
 	
+#	if($numUnderscore>1)
+#	{
+#	    $contigID=~s/\_\d+//;
+#	}
+
 
 	#if the end of the contig is not uniquely alignable throw the contig away
 	if(exists $endPart{$secondKey})
@@ -388,7 +420,7 @@ sub filterContigs($ $ $)
 #		}		
 
 				
-		if(1==2)
+		if(1==1)
 		{
 
 		    if($dev>16)
@@ -571,6 +603,13 @@ sub filterContigs($ $ $)
 	    {
 		$refSubSeq=uc(substr($refSeq{$regions[$secondIndex][0]}, $regions[$secondIndex][1], $size));
 		$contigSeq=uc($contigSeqs{$contigID});
+
+		if(!exists($contigSeqs{$contigID}))
+		{
+		    my $temp=1
+		}
+
+
 	    }else
 	    {
 		next;
@@ -662,7 +701,7 @@ sub filterContigs($ $ $)
 		#push @{$temp[1]}, ($diff-$size)*-1;
 
 		
-	if(1==2)
+	if(1==1)
 	{
 	    if($dev>16)
 	    {
@@ -1080,7 +1119,7 @@ sub getVar_MDstring($)
     my $samFile=shift;
 
 
-    my($cmd, $i, $line, $ref, $read, $operation, @data, $delFlag, $insFlag, $refSeq, $altSeq);
+    my($cmd, $i, $line, $ref, $read, $operation, @data, $delFlag, $insFlag, $refSeq, $altSeq, $refSeqSNP, $altSeqSNP);
     my($delStart, $delEnd, $insStart, $insEnd, $size, $prevPos, $prevContig);
 
     $refSeq="";
@@ -1117,11 +1156,30 @@ if(1==1)
     print Indels "##reference=hg19\n";
     print Indels "##INFO=<ID=Contig,Number=1,Type=String,Description=\"Contig id the variant was derived from\">\n";
     print Indels "##INFO=<ID=Length,Number=1,Type=Integer,Description=\"The length of the indel\">\n";
-    print Indels "##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of indel\">\n";
+    print Indels "##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
     print Indels "##INFO=<ID=AlleleFraction,Number=1,Type=Float,Description=\"The number of reads in contig cluster variant was derived from divided by the coverage in a 200 bp window centered on variant\">\n";
     print Indels "##FORMAT=<ID=GT,Number=1,Type=Integer,Description=\"Genotype\">\n";
     print Indels "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNA12878\n";
- }   
+ } 
+
+if(1==1)
+{
+    open(SNP, ">SnpCalls.vcf");	
+
+
+
+    print SNP "##fileformat=VCFv4.2\n";
+    print SNP "##reference=hg19\n";
+    print SNP "##INFO=<ID=Contig,Number=1,Type=String,Description=\"Contig id the variant was derived from\">\n";
+    print SNP "##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
+    print SNP "##INFO=<ID=AlleleFraction,Number=1,Type=Float,Description=\"The number of reads in contig cluster variant was derived from divided by the coverage in a 200 bp window centered on variant\">\n";
+    print SNP "##FORMAT=<ID=GT,Number=1,Type=Integer,Description=\"Genotype\">\n";
+    print SNP "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNA12878\n";
+}
+
+
+
+  
 
 { my $ofh = select Indels;
 	  $| = 1;
@@ -1229,16 +1287,44 @@ if(1==1)
 		    {
 			next;
 		    }
+
+		    if($data[0] eq "161419_12")
+		    {
+
+			my $temp=1;
+
+		    }
+
 	    
 	#	    print SNP "$data[2]\t$data[6]\t$data[6]\t$data[4]\t$data[7]\t$data[0]\n"; 
-		    print SNP "$data[2]\t$data[6]\t$data[6]\t$data[4]\t$data[7]\n"; 
+#		    print SNP "$data[2]\t$data[6]\t$data[6]\t$data[4]\t$data[7]\n"; 
+
+		    #print Indels "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNA12878\n";
+
+		    $altSeqSNP=uc($data[4]);
+		    $refSeqSNP=uc($data[7]);
+
+		    print SNP "$data[2]\t$data[6]\t.\t$refSeqSNP\t$altSeqSNP\t.\tPASS\tContig=$data[0];Type=SNP;AlleleFraction=.\tGT\t0/1\n";
+
+
 	    
+#		    print Indels "$data[2]\t$delStart\t.\t$refSeq\t$altSeq\t.\tPASS\tContig=$data[0];Length=$size;Type=DEL;AlleleFraction=$allelFraction\tGT\t0/1\n"; 
+
+
 
 		}
 	    
 		if($data[8] eq "D")
 		{
 		    
+		    #check this when done
+		    if($data[0] eq "152695_49")
+		    {
+			my $temp=1;
+
+		    }
+
+
 
 
 		    if($delFlag==1)
@@ -1277,11 +1363,6 @@ if(1==1)
 		    }
 
 		    
-		if($contig[$j][0] eq "151019_13")
-		{
-		    my $temp=1;
-
-		}
 
 		    
 
@@ -1450,6 +1531,11 @@ $cmd="time /data/bin/vcflib/bin/vcfstreamsort -a indelCalls.vcf > foo.dat";
 system($cmd)==0
     or die "system $cmd failed\n";
 
+$cmd="time /data/bin/vcflib/bin/vcfstreamsort -a SnpCalls.vcf > foo2.dat";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+
 
 #removing duplicate variant calls
 #$cmd="time /data/bin/vcflib/bin/vcfuniq foo.dat > indelCalls.vcf";
@@ -1478,6 +1564,12 @@ system($cmd)==0
 $cmd="cat indelCalls.vcf | vcf-sort > temp.vcf";
 system($cmd)==0
     or die "system $cmd failed\n";
+
+$cmd="cat SnpCalls.vcf | vcf-sort > temp2.vcf";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+
 
 
 $cmd="bgzip -c temp.vcf > indelCalls.vcf.gz";
@@ -1572,10 +1664,11 @@ system($cmd)==0
 }
 
 #function to take as input a vcf file and merge the same variants if they meet a certain cutoff number of reads
-sub mergeVariants($ $)
+sub mergeVariants($ $ $)
 {
     my $vcfFile=shift;
     my $cutoff=shift;
+    my $outputFile=shift;
 
     my @vcfMatrix=&parseVCFMatrix($vcfFile);
 
@@ -1584,7 +1677,10 @@ sub mergeVariants($ $)
     my ($i, $sameVarFlag, $sameVarCtr, $covCounter, $j, $sameIndex, $z, $numColumns, $size, $regionsStart, $regionsEnd);
     my($contigID, $allelFraction);
     
-    open(Indels, ">indelCalls.vcf");	
+    open(Indels, ">$outputFile");	
+
+    
+
 
 #or $vcfMatrix[$i][7]=~m/.*Contig\=\d+\_\d+\_\d+.*/
 
@@ -1894,6 +1990,351 @@ sub mergeVariants($ $)
     
     
     close(Indels);
+
+
+}
+
+sub readFastaContig($)
+{
+
+    my $file=shift;
+ 
+    
+    open(SEQ, "$file")
+	|| die "can't open $file file";
+
+
+
+
+    my($line, $id, $seq, %seqResults, $ctr);
+
+    $ctr=0;
+    while($line=<SEQ>)
+    {
+	chomp($line);
+
+	if($line =~m /^\>.*/)
+	{
+
+	    if($ctr>0)
+	    {
+		$seqResults{$id}=$seq;
+
+		 #print "$id\n";
+		
+	    }
+	 
+	   
+	    $line =~m /^\>(\d+)_.*/; 
+	    $id=$1; 
+	    $seq="";
+	    $ctr++;
+	   
+	   
+	    
+	}
+	else
+	{
+	    $seq=$seq.$line;
+	}
+    }
+
+    
+    $seqResults{$id}=$seq;
+
+    close(SEQ);
+
+    return(%seqResults);
+
+}
+
+sub filterContigsVer2($ $ $)
+{
+    my $contigsBed=shift;
+    my $seq=shift;
+    my $cutoff=shift;
+
+
+    my (@regions, $numContigs, $i, $j, $diff, $header, $line, %firstPart, %endPart, $key, $deletion);
+    my ($index, $start, $end, $secondKey, $secondIndex, @temp, $size, $dev, %refSeq, %contigSeqs, $referenceSeq);
+    my ($contigID, $refSubSeq, $contigSeq, $matches, $min, $temp, $numCol, @merged, $printString, $varSeq);
+
+    my(@refString, @contigString, $chr, $null, $compareSeq, $minimum, $minIndex, $distance, $refSeq, $length);
+
+#    open(OUT, ">inversions.bed");
+
+    %contigSeqs=&readFasta($seq);
+
+
+
+if(1==2)
+{
+    #header for vcf file
+    print "##fileformat=VCFv4.1\n";
+    print "##INFO=<ID=Contig, Number=1, Type=String, Description=\"Contig id the variant was derived from\">\n";
+    print "##INFO=<ID=Ends, Number=2, Type=Integer, Description=\"The mapping quality of the two ends of the contig\">\n";
+    print "##INFO=<ID=Length, Number=1, Type=Integer, Description=\"The length of the indel\">\n";
+    print "##INFO=<ID=Type, Number=1, Type=String, Description=\"The type of indel\">\n";
+    print "##INFO=<ID=SVTYPE, Number=1, Type=String, Description=\"The type of indel for indels larger than 15 bps\">\n";
+    print "##INFO=<ID=SVLEN, Number=1, Type=Integer, Description=\"The size of the indel\">\n";
+    print "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+}
+
+
+
+    @regions=&parseBedfile($contigsBed);
+
+    #human
+    #%refSeq=&readFasta("/data/Genomes/human19/allChrhg19InOrder.fa");
+
+    #worm
+    #%refSeq=&readFasta("/home/gabdank/AF_SOL_490/elegans.genome.fa");
+    #%refSeq=&readFasta("/data6/Genomes/cElegans10/allChr.fa");
+
+
+
+    #%contigSeqs=&readFastaContig($seq);
+
+
+    $numContigs=@regions;
+
+    #store the start and end of each contig in seperate hash tables
+    foreach($i=0; $i<$numContigs; $i++)
+    {
+
+
+	if($regions[$i][0]=~m/chrUn/)
+	{
+	    next;
+	}
+
+
+	if($regions[$i][0]=~m/random/)
+	{
+	    next;
+	} 
+
+	if($regions[$i][3]=~m/firstPart/)
+	{
+	    $firstPart{$regions[$i][3]}=$i;
+	}elsif($regions[$i][3]=~m/endPart/)
+	{
+	    $endPart{$regions[$i][3]}=$i;
+	}
+	
+    }
+
+    #pair the second part of each contig with the first part
+    #calcuate distance between the two
+    foreach $key(keys %firstPart){
+
+
+	#print "$key\n\n";
+
+	$secondKey=$key;
+	$secondKey=~s/firstPart/endPart/;
+
+	$index=$firstPart{$key};
+
+
+
+
+
+	#get the size the contig is supposed to be
+	#$key=~m/size=(\d+)/;
+	$key=~m/(.*)\_(\d+)\_(firstPart|endPart)/;
+
+	$contigID=$1;
+	$size=$2;
+
+#	$contigID=~m/^(\d+)\_/;
+
+#	$contigID=$1;
+ 
+	
+	$length=length($contigSeqs{$contigID});
+
+	#if the end of the contig is not uniquely alignable throw the contig away
+	if(exists $endPart{$secondKey})
+	{
+	    $secondIndex=$endPart{$secondKey};
+	}else
+	{
+	    next;
+	}
+
+
+	#if start and end of contig aligne to different chromosomes throw away
+
+	if($regions[$index][0] ne $regions[$secondIndex][0])
+	{
+	    next;
+
+	}
+
+
+	####Uncomment this after processing NIST data
+	#if start and end of contig align to different strands keep
+	if($regions[$index][5] ne $regions[$secondIndex][5])
+	{
+	    next;
+	}	
+	
+#{
+	#$diff=abs($regions[$index][1]-$regions[$secondIndex][2]);
+
+	#push @{$regions[$index]}, $diff;   
+	#push @{$regions[$secondIndex]}, $diff;   
+	
+	
+	 #    @temp=@regions[$index, $secondIndex];
+
+	    
+	  #  &printBed(\@temp);
+	   #  next;
+#	}
+
+	
+	#next;
+
+	
+
+
+	#calculate size difference between aligned start and end of contigs
+	if($regions[$index][5] eq "+")
+	{
+	    #$diff=$regions[$secondIndex][2]-$regions[$index][1];
+	     
+	    $diff=abs($regions[$index][1]-$regions[$secondIndex][2]);
+	     
+	    #@temp=@regions[$index, $secondIndex];
+
+	    $dev=abs($diff-$length);
+	    $start=$regions[$index][2];
+	    $end="$regions[$index][4],$regions[$secondIndex][4];";
+	    
+
+	    #for bed format only
+	    $start=$regions[$index][2];
+	    $end=$regions[$secondIndex][1];
+	
+
+	}    
+
+#$key=~m/(.*)\_(\d+)\_(firstPart|endPart)/;
+	
+
+	if($regions[$index][5] eq "-")
+	{
+	    if($contigID=~m/.*116156.*/)
+	    {
+		my $temp=1;
+	    }
+
+	    #$diff=$regions[$secondIndex][2]-$regions[$index][1];
+	     
+	    $diff=abs($regions[$index][2]-$regions[$secondIndex][1]);
+	     
+
+	    #@temp=@regions[$index, $secondIndex];
+
+	    
+	    $dev=abs($diff-$length);
+	    $start=$regions[$secondIndex][2];
+	    $end="$regions[$index][4],$regions[$secondIndex][4];";
+
+	    #for bed format only
+	    $start=$regions[$secondIndex][2];
+	    $end=$regions[$index][1];
+	
+	    
+	}
+
+	
+	#if($dev>16)
+	#{
+	 #   next;
+	#}
+
+   
+	    if($dev>=$cutoff)
+	    {
+		#$start=$start-5;
+		#$end=$end+5;
+
+
+		
+
+
+	
+		if($start>$end)
+		{
+		    my $temp=$start;
+		    $start=$end;
+		    $end=$start;
+
+		    #if($dev<=3)
+		    #{
+		    #}
+
+		}
+
+
+		$start=$start-10;
+		$end=$end+10;
+
+
+
+	#deletion occured
+		if(($diff-$length)>0)
+		{
+		    $varSeq=".";
+		    $referenceSeq=".";
+
+
+		   
+			    
+		    $printString="$regions[$secondIndex][0]\t$start\t"."."."\t$varSeq\t$referenceSeq\t"."."."\tPASS\tcontig=$contigID;Ends=$end;Length=$dev;Type=deletion";
+
+		    print "$regions[$index][0]\t$start\t$end\t"."$contigID"."deletionsize_"."$dev\n";
+
+		    
+		    #print "$regions[$index][0]\t$start\t$end\n";
+
+
+
+		    #if($dev<300)
+		    #{
+			#print "$printString\n";
+		
+		    #}
+		}
+
+		#insertion occured
+		if(($diff-$length)<0)
+		{
+
+		    $varSeq=".";
+		    $referenceSeq=".";
+
+		    print "$regions[$index][0]\t$start\t$end\t"."$contigID"."insertionsize_"."$dev\n";
+
+		    
+
+		    #print "$regions[$index][0]\t$start\t$end\n";
+
+		    #$printString="$regions[$secondIndex][0]\t$start\t"."."."\t$varSeq\t$referenceSeq\t"."."."\tPASS\tcontig=$contigID;Ends=$end;Length=$dev;Type=insertion";
+
+		}
+		   
+	    }
+	
+	    #next;
+
+	
+    }
+
+
 
 
 }

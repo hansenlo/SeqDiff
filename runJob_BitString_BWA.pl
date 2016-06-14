@@ -291,7 +291,7 @@ system($cmd)==0
 }
 
 
-if(1==1)
+if(1==2)
 {
 
 
@@ -385,7 +385,7 @@ system($cmd)==0
 
 
 
-if(1==1)
+if(1==2)
 {
 ######################Aligning the contigs#####################
 #$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."refGenomeOnly_contigEdges.sam";
@@ -532,8 +532,17 @@ print "Starting iterative alignment\n";
 
 #&iterativeAlignment("/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs_unMapped_poorlyMapped.fasta", 20, 80,  $blastDB, $header);
 
+&iterativeAlignment("/data5/SeqDiffResults/Results/unique_platinumChr21_plusUnmapped_contigs.fasta", 20, 80,  $blastDB, $header);
+
+
 print "Starting to extend alignments\n";
+
+#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "test.dat");
+
+
 #&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs_unMapped_poorlyMapped.fasta");
+
+&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/unique_platinumChr21_plusUnmapped_contigs.fasta");
 
 
 if(1==2)
@@ -906,13 +915,13 @@ sub iterativeAlignment($ $ $ $ $)
 	    #also checking to make sure no soft clipping by looking for S in Cigar string
 #bowtie mapping quality	    
 #if($samOutput[$i][4]>15)
-	    if($samOutput[$i][4]>30 && $samOutput[$i][5]!~/S/)
+	    if($samOutput[$i][4]>40 && $samOutput[$i][5]!~/S/)
 	    {
 	    
 
 
-		$start=$samOutput[$i][3]-1;
-		$end=$samOutput[$i][3]+$j-1;
+		$start=$samOutput[$i][3]-1; #start of contig edge
+		$end=$samOutput[$i][3]+$j-1; #new end of contig edge
 
 		if($samOutput[$i][1]==0)
 		{
@@ -951,13 +960,14 @@ sub iterativeAlignment($ $ $ $ $)
 
 		
 		
-
+		$end=$end-1; #bed format is zero based but same format is 1 based
 		print wasMapped "$samOutput[$i][2]\t$start\t$end\t$samOutput[$i][0]\t$samOutput[$i][4]\t$strand\n";
 	    }elsif(($samOutput[$i][1] & 256)!=256)
 	    {
 		
-		$samOutput[$i][0]=~m/(.*)\_(\d+)\_(firstPart|endPart)/;
+		$samOutput[$i][0]=~m/(.*)\_\d+\_(firstPart|endPart)/;
 
+		
 		$contigID=$1;
 
 		print $needMapped ">$samOutput[$i][0]\n";
@@ -1069,52 +1079,67 @@ sub extendAlignments($ $ $ $)
     for($i=0; $i<$size; $i++)
     {
 
+	#	$contigID=~m/^(\d+)\_/;
+
+
+	if($contigEdges[$i][0] eq "chrM")
+	{
+	    next;
+	}
+
+
 	$contigEdges[$i][3]=~m/(.*)\_(\d+)\_(firstPart|endPart)/;
 
 	$contigID=$1;
-	$length=$2;
+	#$length=$2;
 	$mismatches=0;
 	$posCtr=0;
 
     
+	if($contigEdges[$i][5] eq "+")
+	{
+		    #$refString=substr($refGenome{$contigEdges[$i][0]}, $contigEdges[$i][1], $length);	
+	    $contigString=$contigSeq{$contigID};
+	}
 
+	if($contigEdges[$i][5] eq "-")
+	{
+	    $contigString=&reverse_complement_IUPAC($contigSeq{$contigID});
+	}
+
+
+			
+	$length=length($contigString);
+
+       
 
 	if(($contigEdges[$i][3]=~m/firstPart/ && $contigEdges[$i][5] eq "+") || ($contigEdges[$i][3]=~m/endPart/ && $contigEdges[$i][5] eq "-") )
 	{	
 
 
-	    $refString=uc(substr($refGenome{$contigEdges[$i][0]}, $contigEdges[$i][2]-2, $length));	
+	    $refString=uc(substr($refGenome{$contigEdges[$i][0]}, $contigEdges[$i][1], $length));	
+
+
+#	    if(!defined($refGenome{$contigEdges[$i][0]}))
+#	    {
+#		my $temp=0;
+#	    }
+
 
 	    @refSeq=split(//, $refString);
-       
+
+
 	    
-
-		if($contigEdges[$i][5] eq "+")
-		{
-		    #$refString=substr($refGenome{$contigEdges[$i][0]}, $contigEdges[$i][1], $length);	
-		    $contigString=$contigSeq{$contigID};
-		}
-
-		if($contigEdges[$i][5] eq "-")
-		{
-		    $contigString=&reverse_complement_IUPAC($contigSeq{$contigID});
-		}
-
-
-
-
-
-	    my $temp=substr($refGenome{$contigEdges[$i][0]}, ($contigEdges[$i][2]-2), $length);	
+	    #my $temp=substr($refGenome{$contigEdges[$i][0]}, ($contigEdges[$i][2]-1), $length);	
 
 	    $sizeEdge=$contigEdges[$i][2]-$contigEdges[$i][1];
-
 	    
 #	    print "\n\n\n";
 #	    print "$refString\n";
 #	    print "$contigString\n";
 	    
 
-	    my $debug= (" " x ($sizeEdge-2)).$temp;
+	    #my $debug= (" " x ($sizeEdge-2)).$temp;
 
 #	    print "$debug\n";
 
@@ -1122,32 +1147,48 @@ sub extendAlignments($ $ $ $)
 	    
 	    @splitContig=split(//, $contigString);
 
+	   #  116156_41
+	   
+
 	    #if($contigEdges[$i][3]=~m/133774\_/)
 	    #{
 	#	my $foo=1;
 
 	 #   }
 
-	    $index=$sizeEdge-2;
+	    $index=$sizeEdge-1;
 	    $ctr=0;
 	    $mismatches=0;
 	    $posCtr=1;
 
 	    $sizeContig=length($contigString);
 
+	    my $ctrAdvanced=0;
+
 	    for($j=$index; $j<$sizeContig; $j++)
 	    {
 	       		
-		if($splitContig[$j] ne $refSeq[$ctr])
+		if($splitContig[$j] ne $refSeq[$j])
 		{
 		    $mismatches+=1;   		   
 		}
+
+
+		if($contigEdges[$i][3]=~m/116167\_/)
+		{
+		    my $foo=1;
+
+		}
+
+		
+		
 
 		$ctr++;
 
 		if($mismatches==2 && ($posCtr==2))
 		{
-		    $newEnd=$contigEdges[$i][1]+$j-2;
+		    #$newEnd=$contigEdges[$i][1]+$j-2;
+ 		    $newEnd=$contigEdges[$i][2]+$ctrAdvanced-2;
 		    print $extended "$contigEdges[$i][0]\t$contigEdges[$i][1]\t$newEnd\t$contigEdges[$i][3]\t$contigEdges[$i][4]\t$contigEdges[$i][5]\n";
 		
 		    $posCtr=0;
@@ -1158,7 +1199,8 @@ sub extendAlignments($ $ $ $)
 
 		if($mismatches>=2 && ($posCtr==3))
 		{
-		    $newEnd=$contigEdges[$i][1]+$j-3;
+		    $newEnd=$contigEdges[$i][2]+$ctrAdvanced-3;
+		    #$newEnd=$contigEdges[$i][1]+$j-3;
 		    print $extended "$contigEdges[$i][0]\t$contigEdges[$i][1]\t$newEnd\t$contigEdges[$i][3]\t$contigEdges[$i][4]\t$contigEdges[$i][5]\n";
 
 		    $posCtr=0;
@@ -1181,7 +1223,7 @@ sub extendAlignments($ $ $ $)
 		}
 
 		
-
+		$ctrAdvanced++;
 	    }	
 	
 	}
@@ -1191,7 +1233,7 @@ sub extendAlignments($ $ $ $)
 	if(($contigEdges[$i][3]=~m/endPart/ && $contigEdges[$i][5] eq "+") || ($contigEdges[$i][3]=~m/firstPart/ && $contigEdges[$i][5] eq "-") )
 	{	
 
-	    $refString=uc(substr($refGenome{$contigEdges[$i][0]}, $contigEdges[$i][2]-$length-1, $length));	
+	    $refString=uc(substr($refGenome{$contigEdges[$i][0]}, $contigEdges[$i][2]-$length, $length));	
 
 	    @refSeq=split(//, $refString);
        	    
@@ -1216,7 +1258,7 @@ sub extendAlignments($ $ $ $)
 #	    print "$contigString\n";
 	    
 
-	    my $debug=(" " x ($length-($sizeEdge))).substr($refString, ($length-($sizeEdge)));
+	    #my $debug=(" " x ($length-($sizeEdge))).substr($refString, ($length-($sizeEdge)));
 
 #	    print "$debug\n";
 
@@ -1224,11 +1266,11 @@ sub extendAlignments($ $ $ $)
 	    
 	    @splitContig=split(//, $contigString);
 
-	    #if($contigEdges[$i][3]=~m/133774\_/)
-	    #{
-	#	my $foo=1;
+#	    if($contigEdges[$i][3]=~m/116167\_/)
+#	    {
+#		my $foo=1;
 
-	 #   }
+#	    }
 
 	    $index=$length-$sizeEdge;
 	    $ctr=0;
@@ -1237,19 +1279,39 @@ sub extendAlignments($ $ $ $)
 
 	    $sizeContig=length($contigString);
 
+	    my $ctrAdvanced=0;
 	    for($j=$index; $j>=0; $j--)
 	    {
+
+		if(!defined($splitContig[$j]) || !defined($refSeq[$j]))
+		{
+		    my $temp=1;
+		}
+
 	       		
 		if($splitContig[$j] ne $refSeq[$j])
 		{
 		    $mismatches+=1;   		   
 		}
 
+		if(!defined($splitContig[$j]) || !defined($refSeq[$j]))
+		{
+		    my $temp=1;
+		    
+		}
+
+
+
+
 		$ctr++;
+
+		#also print out length of contig edges
 
 		if($mismatches==2 && ($posCtr==2))
 		{
-		    $newStart=$contigEdges[$i][2]-($length-$j-1);
+		    #$newStart=$contigEdges[$i][2]-($length-$j-1);
+		    $newStart=$contigEdges[$i][1]-$ctrAdvanced+2;
+		    
 		    print $extended "$contigEdges[$i][0]\t$newStart\t$contigEdges[$i][2]\t$contigEdges[$i][3]\t$contigEdges[$i][4]\t$contigEdges[$i][5]\n";
 		
 		    $posCtr=0;
@@ -1260,7 +1322,9 @@ sub extendAlignments($ $ $ $)
 
 		if($mismatches>=2 && ($posCtr==3))
 		{
-		    $newStart=$contigEdges[$i][2]-($length-$j-2);
+		    #$newStart=$contigEdges[$i][2]-($length-$j-2);
+		    $newStart=$contigEdges[$i][1]-$ctrAdvanced+3;
+		    
 		    print $extended "$contigEdges[$i][0]\t$newStart\t$contigEdges[$i][2]\t$contigEdges[$i][3]\t$contigEdges[$i][4]\t$contigEdges[$i][5]\n";
 		
 		
@@ -1284,6 +1348,7 @@ sub extendAlignments($ $ $ $)
 		}
 
 		
+		$ctrAdvanced++;
 
 	    }	
 	
@@ -1294,5 +1359,59 @@ sub extendAlignments($ $ $ $)
 
 
     }
+
+}
+
+sub readFastaContig($)
+{
+
+    my $file=shift;
+ 
+    
+    open(SEQ, "$file")
+	|| die "can't open $file file";
+
+
+
+
+    my($line, $id, $seq, %seqResults, $ctr);
+
+    $ctr=0;
+    while($line=<SEQ>)
+    {
+	chomp($line);
+
+	if($line =~m /^\>.*/)
+	{
+
+	    if($ctr>0)
+	    {
+		$seqResults{$id}=$seq;
+
+		 #print "$id\n";
+		
+	    }
+	 
+	   
+	    $line =~m /^\>(\d+)_.*/; 
+	    $id=$1; 
+	    $seq="";
+	    $ctr++;
+	   
+	   
+	    
+	}
+	else
+	{
+	    $seq=$seq.$line;
+	}
+    }
+
+    
+    $seqResults{$id}=$seq;
+
+    close(SEQ);
+
+    return(%seqResults);
 
 }

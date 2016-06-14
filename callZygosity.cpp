@@ -3,6 +3,7 @@
 #include<vector>
 #include<sstream>
 #include<fstream>
+#include <stdlib.h> 
 
 #include "ReadCluster.h"
 #include "utilities.h"
@@ -43,15 +44,33 @@ void getKmer(unordered_map<string, string> &genome, string chr, long position, s
 void convertBitString(string &sequence, int kmerSize, bitset<bitSetSize> &bitString);
 
 //will return 0 for heterzygote and 1 for homozygote will return 2 if cannot decide
-int callZygosity(dense_hash_map<bitset<bitSetSize>, int, stdHash> &uniqueKmers, dense_hash_map<bitset<bitSetSize>, int, stdHash> &allKmers, vector<string> &vcfRecord, int kmerSize, unordered_map<string, string> &genome, std::vector< bitset<bitSetSize> > &bitTable, bitset<bitSetSize> &clearbitWord, int zygosityCutoff);
+int callZygosity(dense_hash_map<bitset<bitSetSize>, int, stdHash> &uniqueKmers, dense_hash_map<bitset<bitSetSize>, int, stdHash> &allKmers, int indexVcfRecord, vector<vector<string>> &vcf, int kmerSize, unordered_map<string, string> &genome, std::vector< bitset<bitSetSize> > &bitTable, bitset<bitSetSize> &clearbitWord, int zygosityCutoff);
+
+//int callZygosity(dense_hash_map<bitset<bitSetSize>, int, stdHash> &uniqueKmers, dense_hash_map<bitset<bitSetSize>, int, stdHash> &allKmers, vector<string> &vcfRecord, int kmerSize, unordered_map<string, string> &genome, std::vector< bitset<bitSetSize> > &bitTable, bitset<bitSetSize> &clearbitWord, int zygosityCutoff);
+
+
 
 //given a vcf matrix print it to the given file
 void printVcf(vector<vector<string>> &vcf, string outputFile);
 
-
+//this function will treat each variant as an island not considering nearby variants
 int checkUniqueness(unordered_map<string, string> &genome, string &altSeq, dense_hash_map<bitset<bitSetSize>, int, stdHash> &uniqueKmers, dense_hash_map<bitset<bitSetSize>, int, stdHash> &allKmers, int kmerSize, std::vector< bitset<bitSetSize> > &bitTable, bitset<bitSetSize> &clearbitWord, int zygosityCutoff, vector<string> &vcfRecord, bool forward); //bool forward variable means do you start from the begining or end of the alternative Seq
 //forward set to true means start from the beginning bool set to false means start from the end 
 
+//this function will group variants together when considering them  
+//bool forward variable means do you start from the begining or end of the alternative Seq
+//forward set to true means start from the beginning bool set to false means start from the end 
+int checkUniquenessGroup(string &altSeq, string &mixedSeq, string &wildType, dense_hash_map<bitset<bitSetSize>, int, stdHash> &uniqueKmers, dense_hash_map<bitset<bitSetSize>, int, stdHash> &allKmers, int kmerSize, std::vector< bitset<bitSetSize> > &bitTable, bitset<bitSetSize> &clearbitWord, vector<int> &positionsVariant, int zygosityCutoff, bool forward);
+
+
+//given a vcf record and the set of all vcf records return the alterative sequence that incorportes the variant in the vcf record and all variants within kmerSize 
+ //function returns the starting positions in the sequence of the variant of interest order is altSeq, mixedSeq, wildType
+vector<int> getAltSeq(string &altSeq, string &mixedSeq, string &wildType, int indexVcfRecord, vector<vector<string>> &vcf, int kmerSize, unordered_map<string, string> &genome);
+
+
+//given a collection of vcf records a specific index into that collection and a flag indicating whether to look upstream or downstream of the given variant
+//return a vector in indexes representing variants withint kmerSize of the given variant
+void collectVcf(vector<vector<string>> &vcf, int indexVcfRecord, vector<int> &indexToInclude, bool backward, int kmerSize); 
 
 
 int main(int argc, char *argv[] )
@@ -59,16 +78,56 @@ int main(int argc, char *argv[] )
 
   //vector<vector<string>> samResults;
   
-int kmerSize=45;
+  int kmerSize=45;
 
 
-vector<vector<string>> vcfResults;
+  vector<vector<string>> vcfResults;
   
 
-cerr<<"starting to parse vcf file "<<endl;
+    //cerr<<"starting to parse vcf file "<<endl;
 					  //parseSam(samResults, "/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped.sam", 20);
 
-parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/indelCalls.vcf"); 
+				     //parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/indelCalls.vcf"); 
+
+  //parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/indelCalls_BWA.vcf"); 
+
+  parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/allCalls_merged_BWA.vcf"); 
+
+  //parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/temp.vcf"); 
+
+
+
+    cerr<<"Starting to read in genome \n";
+
+	  unordered_map<string, string> genome;
+
+					  
+	  readInFasta(genome, "/data/Genomes/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
+
+	  /*
+	  cerr<<"reached this point started alternate Seq generation "<<endl;
+
+	  string altSeq, mixedSeq, wildType;
+	  vector<int> positionsVariant;
+
+	  //alt Seq is with all variants included with a mix of reference sequence
+	  //mixed Seq is a mix of reference seq and variants the variant of interest is converted to reference not included
+	  //wildType is just the reference seq
+	  positionsVariant=getAltSeq(altSeq, mixedSeq, wildType, 2922, vcfResults, kmerSize, genome);
+	  
+	  cerr<<"alternate sequence is "<<altSeq<<" \n";
+	  cerr<<"mixedSeq is "<<mixedSeq<<endl;
+	  cerr<<"wildTypeSeq is "<<wildType<<endl;
+
+	  for(int z=0; z<positionsVariant.size(); z++)
+	    {
+	      cerr<<positionsVariant[z]<<"\t";
+	    }
+
+	  cerr<<"\n";
+
+	  return(0);
+	  */
 
 
 
@@ -93,20 +152,18 @@ allKmers.resize(400000000);
 
 char continueFlag='0';
 
-cerr<<"reading in unique kmers "<<endl;
+ cerr<<"reading in unique kmers "<<endl;
+
 				     //reading in unique kmers
-readUniqueKmers(uniqueKmers, continueFlag, "/data7/PlatinumAlignments/platinumChr21_plusUnmapped_kmerCounts_RefSubtracted_45k_database_human_Readable.dat", kmerSize, 8); //Need to uncomment for code to work
+ readUniqueKmers(uniqueKmers, continueFlag, "/data7/PlatinumAlignments/platinumChr21_plusUnmapped_kmerCounts_RefSubtracted_45k_database_human_Readable.dat", kmerSize, 8); //Need to uncomment for code to work
 
-cerr<<"reading in all kmers "<<endl;
+ cerr<<"reading in all kmers "<<endl;
+
 				     //reading in all kmers
-readUniqueKmers(allKmers, continueFlag, "/data7/PlatinumAlignments/platinumChr21_plusUnmapped_kmerCounts_45k_database_human_Readable.dat", kmerSize, 2); //Need to uncomment for code to work
+  readUniqueKmers(allKmers, continueFlag, "/data7/PlatinumAlignments/platinumChr21_plusUnmapped_kmerCounts_45k_database_human_Readable.dat", kmerSize, 2); //Need to uncomment for code to work
 
 
-unordered_map<string, string> genome;
 
-
-cerr<<"Starting to read in genome "<<endl;					  
-readInFasta(genome, "/data/Genomes/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
 
 				     /*
 string kmer="";
@@ -133,12 +190,20 @@ bool samePosition=false;
 int sameIndex, j;
 samePositionCtr=0;
 
+ string longestRefSeq;
 			
 	  for(i=0; i<vcfResults.size(); i++)
 	      {
 		if(vcfResults[i][0][0]=='#') //do not run header vcf lines
 		  {
 		    continue;
+		  }
+
+		if(i % 1000==0)
+		  {
+		    
+		    cerr<<"number of records processed is "<<i<<endl;
+
 		  }
 		
 
@@ -165,21 +230,92 @@ samePositionCtr=0;
 
 		      }else
 			 {
-			   //if variants all have the same position then call them heterozygoute
+			   //if variants all have the same position then determine appropriate 
 			   if(samePosition)
 			     {
 
 			       sameIndex=i-samePositionCtr;
-			      
+		
+			       int max=0;
+			       //finding the longest reference sequence and storing it
 			       for(j=sameIndex; j<=(i); j++)
 				 {				   
-				   vcfResults[j][genotypeIndex]="0/1";
+		
+				   if(vcfResults[j][3].length()>max)
+				     {
+				       longestRefSeq=vcfResults[j][3];
+				       
+				     }
+
 				 }
 
+			 
+			       for(j=sameIndex; j<=(i); j++)
+				 {				   
+				  
+				     
+				       string altSeq=vcfResults[j][4];
+				       string newAltSeq;
+
+				       if(vcfResults[j][3].length() > vcfResults[j][4].length()) //then is a deletion
+					 {
+					   newAltSeq=longestRefSeq;
+					   
+					   newAltSeq.erase(1, (vcfResults[j][3].length()-1)); //removing the deletion from the reference sequence
+					   
+					   //					   if(vcfResults[j][1]=="15663777")
+					   //{
+					   //cerr<<"newAltSeq in Deletion is "<<newAltSeq<<" alt Seq is "<<vcfResults[j][4]<<" ref Seq is "<<vcfResults[j][3]<<" longestRefSeq is "<<longestRefSeq<<" size to delete is "<<vcfResults[j][3].length()-1<<endl;
+					   
+					   //}
+
+
+					 }else if(vcfResults[j][3].length() < vcfResults[j][4].length()) //then is an insertion
+					 {
+					 
+					   newAltSeq=longestRefSeq;
+					  
+					   string insertedSeq=vcfResults[j][4].substr(1); //getting the sequence that was inserted
+					   newAltSeq.insert(1, insertedSeq); //adding inserted sequence
+			   
+					   //if(vcfResults[j][1]=="15663777")
+					   //{
+					   //cerr<<"newAltSeq in Insertion is "<<newAltSeq<<" alt Seq is "<<vcfResults[j][4]<<" ref Seq is "<<vcfResults[j][3]<<" longestRefSeq is "<<longestRefSeq<<endl;
+					   //}
+
+
+
+					 }else if(vcfResults[j][4].length()==vcfResults[j][3].length()) //then is a snp
+					 {
+					   newAltSeq=longestRefSeq;
+					   newAltSeq[1]=vcfResults[j][4][0];
+
+					 }
+
+				       if(j==sameIndex)
+					 {
+					    //clearing the alternative Sequence
+					   vcfResults[sameIndex][4]=newAltSeq;
+
+					 }else
+					 {
+
+					   vcfResults[sameIndex][4]=vcfResults[sameIndex][4]+","+newAltSeq; //adding all the alternative allels for variants that map to the same location
+					   vcfResults[j][0]="-";
+				       
+					 }
+				     
+				 
+				 }
+
+			       //setting the genotype and reference sequence for merged variants 
+			       vcfResults[sameIndex][genotypeIndex]=std::to_string(samePositionCtr+1)+"|"+std::to_string(samePositionCtr); //setting the right genotype for multiple variants that map to the same location
+			       vcfResults[sameIndex][3]=longestRefSeq;
 
 			       samePosition=false;
 			       samePositionCtr=0;
 			       continue;
+
 			     }else
 			     {
 
@@ -194,20 +330,33 @@ samePositionCtr=0;
 
 	      
 
-		//cerr<<" i is "<<i<<endl;
+		//cerr<<" i is "<<i<<" "<<vcfResults[i][1]<<endl;
 	    //if more than 4 reads contain the reference sequence than do not call it a homozygoty	    
-		call=callZygosity(uniqueKmers, allKmers, vcfResults[i], kmerSize, genome, bitTable, clearbitWord, 4);
+		//call=callZygosity(uniqueKmers, allKmers, vcfResults[i], kmerSize, genome, bitTable, clearbitWord, 4);
 
-		//call=callZygosity(uniqueKmers, allKmers, vcfResults[2904], kmerSize, genome, bitTable, clearbitWord, 4);
+
+		//cerr<<" i is "<<i<<" "<<vcfResults[480][1]<<endl;
+	    
+
+		//call=callZygosity(uniqueKmers, allKmers, 480, vcfResults, kmerSize, genome, bitTable, clearbitWord, 4);
+		call=callZygosity(uniqueKmers, allKmers, i, vcfResults, kmerSize, genome, bitTable, clearbitWord, 4);
+
+		//return(0);
+
+		//call=callZygosity(uniqueKmers, allKmers, vcfResults[28], kmerSize, genome, bitTable, clearbitWord, 4);
 
 		    
 		    if(call==0) //heterozygote
 		      {
+			
 			//cerr<<"variant is a heterozygot! "<<endl;
 			
 			vcfResults[i][genotypeIndex]="0/1";
-		      }else if(call=1)
+		      }else if(call==1)
 		      {
+		
+			//cerr<<"variant is a homozygout! "<<endl;
+
 			vcfResults[i][genotypeIndex]="1/1";
 		      }
 
@@ -411,6 +560,8 @@ void getKmer(unordered_map<string, string> &genome, string chr, long position, s
   CbitString.set((2*kmerSize)-2);
 
 
+  //cerr<<"Sequence in convertBitSTring is "<<sequence<<endl;
+
 
  if(kmerSize==0)
     {
@@ -514,28 +665,28 @@ void getKmer(unordered_map<string, string> &genome, string chr, long position, s
 	     
 }
 
-int callZygosity(dense_hash_map<bitset<bitSetSize>, int, stdHash> &uniqueKmers, dense_hash_map<bitset<bitSetSize>, int, stdHash> &allKmers, vector<string> &vcfRecord, int kmerSize, unordered_map<string, string> &genome, std::vector< bitset<bitSetSize> > &bitTable, bitset<bitSetSize> &clearbitWord, int zygosityCutoff)
+int callZygosity(dense_hash_map<bitset<bitSetSize>, int, stdHash> &uniqueKmers, dense_hash_map<bitset<bitSetSize>, int, stdHash> &allKmers, int indexVcfRecord, vector<vector<string>> &vcf, int kmerSize, unordered_map<string, string> &genome, std::vector< bitset<bitSetSize> > &bitTable, bitset<bitSetSize> &clearbitWord, int zygosityCutoff)
 {
 
   int i, lengthRef, lengthAlt, startRefSeq, endRefSeq;
-  string altSeq, endPart;
+  string  endPart;
 
   uint_fast64_t position;
 
   int bitWord=16;
 
-
+  /*
   lengthRef=vcfRecord[3].length(); //getting the length of the reference seq. 
   lengthAlt=vcfRecord[4].length(); //getting the length of the alternative seq. 
 
   position=stoull(vcfRecord[1], NULL, 10);
 
   
-
   //cerr<<"position of variant is "<<position<<endl;
 
   //getting the initial kmer subtracting 1 becase vcf coordinates are 1 based
   getKmer(genome, vcfRecord[0], position-kmerSize-1, altSeq, kmerSize); 
+
 
   
   altSeq.append(vcfRecord[4]);
@@ -553,27 +704,87 @@ int callZygosity(dense_hash_map<bitset<bitSetSize>, int, stdHash> &uniqueKmers, 
   //getting the start in the genome of the reference sequence segment that corresponds to the altenative sequence
   startRefSeq=(position+lengthRef-1+2*kmerSize)-altSeq.length();
   endRefSeq=startRefSeq+altSeq.length();
+  */
+
+
+
+	  string altSeq, mixedSeq, wildType;
+	  vector<int> positionsVariant;
+
+	  //alt Seq is with all variants included with a mix of reference sequence
+	  //mixed Seq is a mix of reference seq and variants the variant of interest is converted to reference not included
+	  //wildType is just the reference seq
+
+	  //cerr<<"before get alternative sequence "<<vcf[indexVcfRecord][1]<<endl;
+
+	  positionsVariant=getAltSeq(altSeq, mixedSeq, wildType, indexVcfRecord, vcf, kmerSize, genome);
+
+	  //return(0);
+
+	  //converting to uppercase
+	  //std::transform(altSeq.begin(), altSeq.end(), altSeq.begin(), ::toupper);
+	  //std::transform(mixedSeq.begin(), mixedSeq.end(), mixedSeq.begin(), ::toupper);
+	  // std::transform(wildType.begin(), wildType.end(), wildType.begin(), ::toupper);
+	  
+	  //cerr<<"lenght of alt seq is "<<altSeq.length()<<endl;
+	  //cerr<<vcf[indexVcfRecord][1]<<endl;
+	  //cerr<<"after get AltSeq "<<endl;
+	 
+
+
+	  /*
+	  cerr<<"alternate sequence is "<<altSeq<<" \n";
+	  cerr<<"mixedSeq is "<<mixedSeq<<endl;
+	  cerr<<"wildTypeSeq is "<<wildType<<endl;
+
+	  for(int z=0; z<positionsVariant.size(); z++)
+	    {
+	      cerr<<positionsVariant[z]<<"\t";
+	    }
+
+	  cerr<<"\n";
+	  */
+
+
+
+
 
 
   //getKmer(genome, vcfRecord[0], startRefSeq, refSeq, altSeq.length()); 
 
   //looking for the first unique word
 
+
+
+
+
+
+
   bool isUnique=false;
   int seqPosition=altSeq.length()-kmerSize;
+
+
 
 
   //cerr<<"starting from end of alt seqeunce "<<endl;
   //bool forward variable means do you start from the begining or end of the alternative Seq
   bool forward=false;
-  int zygosityFlagBackward=checkUniqueness(genome, altSeq, uniqueKmers, allKmers, kmerSize, bitTable, clearbitWord, zygosityCutoff, vcfRecord, forward);
+// int zygosityFlagBackward=checkUniqueness(genome, altSeq, uniqueKmers, allKmers, kmerSize, bitTable, clearbitWord, zygosityCutoff, vcfRecord, forward);
+
+
+  //cerr<<"before backward check Uniqueness "<<endl;
+  int zygosityFlagBackward=checkUniquenessGroup(altSeq, mixedSeq, wildType, uniqueKmers, allKmers, kmerSize, bitTable, clearbitWord, positionsVariant, zygosityCutoff, forward);
+  //cerr<<"After backward check Uniqueness "<<endl;
+
 
   //cerr<<"end of alt sequence  backward flag is "<<zygosityFlagBackward<<endl;
 
-  forward=true;
-  int zygosityFlagForward=checkUniqueness(genome, altSeq, uniqueKmers, allKmers, kmerSize, bitTable, clearbitWord, zygosityCutoff, vcfRecord, forward);
-  //cerr<<"starting from beginning of alt sequence  backward flag is "<<zygosityFlagForward<<endl;
-
+ forward=true;
+  // int zygosityFlagForward=checkUniqueness(genome, altSeq, uniqueKmers, allKmers, kmerSize, bitTable, clearbitWord, zygosityCutoff, vcfRecord, forward);
+ int zygosityFlagForward=checkUniquenessGroup(altSeq, mixedSeq, wildType, uniqueKmers, allKmers, kmerSize, bitTable, clearbitWord, positionsVariant, zygosityCutoff, forward);
+  
+  //
+ //cerr<<"starting from beginning of alt sequence forward flag is "<<zygosityFlagForward<<endl;
 
 
   if(zygosityFlagBackward > 1 && zygosityFlagForward > 1)
@@ -614,6 +825,11 @@ void printVcf(vector<vector<string>> &vcf, string outputFile)
   
   for(i=0; i<vcf.size(); i++)
     {
+      if(vcf[i][0]=="-") //if vcf record stars with this symbol means it is one of many that map to same location only print one of those and skip the rest
+	{
+	  continue; 
+	}
+
       for(j=0; j<(vcf[i].size()-1); j++)
 	{
 	  vcfOut<<vcf[i][j]<<"\t";
@@ -634,7 +850,6 @@ void printVcf(vector<vector<string>> &vcf, string outputFile)
 
 
 int checkUniqueness(unordered_map<string, string> &genome, string &altSeq, dense_hash_map<bitset<bitSetSize>, int, stdHash> &uniqueKmers, dense_hash_map<bitset<bitSetSize>, int, stdHash> &allKmers, int kmerSize, std::vector< bitset<bitSetSize> > &bitTable, bitset<bitSetSize> &clearbitWord, int zygosityCutoff, vector<string> &vcfRecord, bool forward) //bool forward variable means do you start from the begining or end of the alternative Seq
-//forward set to true means start from the beginning bool set to false means start from the end 
 {
 
   int bitWord=16;
@@ -720,6 +935,8 @@ int checkUniqueness(unordered_map<string, string> &genome, string &altSeq, dense
 	 
 	  //cerr<<"ref equnivalent of unique word is "<<refSeq<<" seqPosition is "<<seqPosition<<" startRefSeq is "<<startRefSeq<<endl;
 
+	  
+
 	  //get the reference sequence corresponding to the variant
 	  bitString.reset();
 	  reversedString.reset();
@@ -777,9 +994,506 @@ int checkUniqueness(unordered_map<string, string> &genome, string &altSeq, dense
 
 
 }      	  
+
+//function returns the starting positions in the sequence of the variant of interest order is altSeq, mixedSeq, wildType
+vector<int> getAltSeq(string &altSeq, string &mixedSeq, string &wildType, int indexVcfRecord, vector<vector<string>> &vcf, int kmerSize, unordered_map<string, string> &genome)
+{
+  
+  int lengthRef; //=vcf[indexVcfRecord][3].length(); //getting the length of the reference seq. 
+  int lengthAlt; //=vcf[indexVcfRecord][4].length(); //getting the length of the alternative seq. 
+  vector<int> postionsVariant; //starting position in the sequence of the variant of interest
+  int posAlt, posMixed, posWild;
+
+  vector<int> indexToInclude; //vector to hold the indexes of the vcf records to incoporate into the alternate sequence
+
+
+  //cerr<<"before forward collectVcf "<<endl;
+
+  //get vcf records within kmerSize upstream of the highlighted variant
+  collectVcf(vcf,  indexVcfRecord, indexToInclude, true, kmerSize);
+
+
+  //cerr<<"before backward collectVcf "<<endl;
+  //get vcf records within kmerSize downstream of the highlighted variant
+  collectVcf(vcf,  indexVcfRecord, indexToInclude, false, kmerSize);
+  
+  //cerr<<"after collectVcf "<<endl;
+
+  //sorting the vector
+  sort(indexToInclude.begin(), indexToInclude.end());
+
+
+  /*
+  int j;
+
+  for(j=0; j<indexToInclude.size(); j++)
+    {
+      cerr<<indexToInclude[j]<<endl;
+    }
+  */
+  
+  //cerr<<"Position is "<<vcf[indexToInclude[0]][1]<<endl;  
+
+
+/*
+  //beginning
+
+
+//getting the initial kmer subtracting 1 becase vcf coordinates are 1 based
+  getKmer(genome, vcfRecord[0], position-kmerSize-1, altSeq, kmerSize); 
+
+  
+  altSeq.append(vcfRecord[4]);
+  
+  //cerr<<"got alt seq first part "<<endl;
+
+  getKmer(genome, vcfRecord[0], position+lengthRef-1, endPart, kmerSize*2); 
+
+  altSeq.append(endPart);
+
+  //cerr<<"got alt seq end part "<<endl;
+
+  //cerr<<"altSeq is "<<altSeq<<endl;
+
+  //getting the start in the genome of the reference sequence segment that corresponds to the altenative sequence
+  startRefSeq=(position+lengthRef-1+2*kmerSize)-altSeq.length();
+  endRefSeq=startRefSeq+altSeq.length();
+
+  //end 
+  */
+
+
+
+
+
+
+  //cerr<<indexToInclude[0]<<"\t"<<indexToInclude[1]<<endl;
+  
+  //cerr<<"position of variant is "<<position<<endl;
+
+  int i;
+  //string altSeq;
+  long positionPrev, positionCurrent, lengthPrevRef, lengthCurrRef;
+  string endPart;
+
+  positionCurrent=stoull(vcf[indexToInclude[0]][1], NULL, 10);
+
+  //getting the initial sequence
+  getKmer(genome, vcf[indexToInclude[0]][0], positionCurrent-(3*kmerSize)-1, altSeq, 3*kmerSize);
+  mixedSeq=altSeq; //getting the wild type sequence only 
+  wildType=altSeq; //getting the witd type sequence only
+
+
+  if(indexToInclude[0]!=indexVcfRecord)
+    {
+     
+      mixedSeq.append(vcf[indexToInclude[0]][4]);   
+
+    }else
+    {
+
+      posAlt=altSeq.length();
+      posMixed=altSeq.length();
+      posWild=altSeq.length();
+      
+      mixedSeq.append(vcf[indexToInclude[0]][3]); //append the reference sequence
+     
+    }
+
+  altSeq.append(vcf[indexToInclude[0]][4]); //adding the alternant sequence from the variant
+  wildType.append(vcf[indexToInclude[0]][3]);
+ 
+
+   lengthCurrRef=vcf[indexToInclude[0]][3].length();
+
+   //cerr<<"adding to alt seq this  "<<vcf[indexToInclude[0]][4]<<endl;
+ 
+   //cerr<<"alt seq at this point is "<<altSeq<<endl;
+ 
+  for(i=1; i<indexToInclude.size(); i++)
+    {
+
+      positionPrev=stoull(vcf[indexToInclude[i-1]][1], NULL, 10);
+      positionCurrent=stoull(vcf[indexToInclude[i]][1], NULL, 10);
+
+     
+      lengthPrevRef=vcf[indexToInclude[i-1]][3].length();
+      
+      if((positionCurrent-positionPrev-lengthPrevRef)<0) //if two variants have the same position ignore the second and use the first
+	{
+	  continue;
+	
+	}
+
+
+
+      lengthCurrRef=vcf[indexToInclude[i]][3].length();
+      
+
+      //cerr<<"length is "<<positionCurrent-positionPrev-lengthPrevRef<<endl;
+
+      
+      string section;
+      getKmer(genome, vcf[indexToInclude[i]][0], positionPrev+lengthPrevRef-1, section, positionCurrent-positionPrev-lengthPrevRef); 
+      
+      altSeq.append(section);
+      mixedSeq.append(section);
+      wildType.append(section);
+
+      //cerr<<"after appending the section on "<<altSeq<<" section is "<<section<<endl;
+
+      if(indexToInclude[i]!=indexVcfRecord)
+	{
+
+	  mixedSeq.append(vcf[indexToInclude[i]][4]); //append alternate sequence if not the variant of interest 
+
+	}else
+	{    
+
+	  posAlt=altSeq.length();
+	  posMixed=mixedSeq.length();
+	  posWild=wildType.length();
+	  mixedSeq.append(vcf[indexToInclude[i]][3]); //append the reference sequence    
+	}
+
+      
+      wildType.append(vcf[indexToInclude[i]][3]);      
+      altSeq.append(vcf[indexToInclude[i]][4]);
+
+      //cerr<<"just appended "<<vcf[indexToInclude[i]][4]<<endl;
+      
+ 
+    }
+
+  //attaching the last little bit of reference sequence
+
+  //cerr<<"wild sequence is "<<wildType<<endl;
+
+
+  getKmer(genome, vcf[indexToInclude[0]][0], positionCurrent+lengthCurrRef-1, endPart, kmerSize*3); 
+
+  //cerr<<"now appending "<<endPart<<endl;
+  
+  altSeq.append(endPart);
+  mixedSeq.append(endPart);
+  wildType.append(endPart);
+
+  postionsVariant.push_back(posAlt);
+  postionsVariant.push_back(posMixed);
+  postionsVariant.push_back(posWild);
+
+
+
+  //cerr<<"alt seq is "<<altSeq<<endl;
+
+      /*
+  //cerr<<"got alt seq first part "<<endl;
+
+  getKmer(genome, vcfRecord[0], position+lengthRef-1, endPart, kmerSize*2); 
+
+  altSeq.append(endPart);
+
+  //cerr<<"got alt seq end part "<<endl;
+
+  //cerr<<"altSeq is "<<altSeq<<endl;
+
+  //getting the start in the genome of the reference sequence segment that corresponds to the altenative sequence
+  startRefSeq=(position+lengthRef-1+2*kmerSize)-altSeq.length();
+  endRefSeq=startRefSeq+altSeq.length();
+      */
+
+
+  return(postionsVariant);  
+
+}
+void collectVcf(vector<vector<string>> &vcf, int indexVcfRecord, vector<int> &indexToInclude, bool backward, int kmerSize)
+{
+
+  long position=stoull(vcf[indexVcfRecord][1], NULL, 10);
+
+  int currentIndex, currentPosition;
+  
+  double sizeVcf=vcf.size(); //number of vcf records
+
+  //cerr<<"before if statement collectVcf "<<endl;
+
+  if(backward){
+
+    currentPosition=stoull(vcf[indexVcfRecord][1], NULL, 10);
+    currentIndex=indexVcfRecord;
+
+  }else
+    {
+      if((indexVcfRecord+1)<sizeVcf)
+	{
+
+	  currentPosition=stoull(vcf[indexVcfRecord+1][1], NULL, 10);
+	  currentIndex=indexVcfRecord+1;
+	}else
+	{
+
+	  return;
+
+	}
+    
+    }
+
+
+  //cerr<<"after if statement collectVcf "<<endl;
+    
+  
+  //getting all vcf records with kmerSize of the variant of interest that occur before the variant
+  while( (vcf[indexVcfRecord][0]==vcf[currentIndex][0]) && (abs(position-currentPosition) < kmerSize))
+    {      
+      //cerr<<"adding index "<<currentIndex<<endl;
+      ///cerr<<"size of vcf file is "<<sizeVcf<<endl;
+
+      indexToInclude.push_back(currentIndex);
+      
+      
+      if((currentIndex-1)>=0)
+	{
+	  if(backward)
+	    {
+	      currentIndex--;
+	    }else
+	    {
+	      currentIndex++;
+	    }
+
+
+	}else
+	{
+	  break;
+	}
+     
+      if(currentIndex==sizeVcf)
+	{
+	  break;
+	}
+
+
+      if(vcf[currentIndex][0][0]!='#')//if the first character is a pound symbol than have reached the comments part of vcf file 
+	{
+
+	  currentPosition=stoull(vcf[currentIndex][1], NULL, 10);
+	}else
+	{
+	  break;
+	}
+      
+	  //cerr<<"currentPosition is "<<currentPosition<<endl;
+    }
+
+
+
+
+}
+
+//forward set to true means start from the beginning bool set to false means start from the end 
+
+int checkUniquenessGroup(string &altSeq, string &mixedSeq, string &wildType, dense_hash_map<bitset<bitSetSize>, int, stdHash> &uniqueKmers, dense_hash_map<bitset<bitSetSize>, int, stdHash> &allKmers, int kmerSize, std::vector< bitset<bitSetSize> > &bitTable, bitset<bitSetSize> &clearbitWord, vector<int> &positionsVariant, int zygosityCutoff, bool forward)
+{
+
+  int bitWord=16;
+
+  int i, lengthRef, lengthAlt, startRefSeq, endRefSeq;
+  uint_fast64_t position;
+  int seqPosition, seqCtr;
+
+  bool isUnique=false;
+    
+  seqCtr=0;
+
+
+    //    cerr<<"seqCtr is "<<seqCtr<<endl;
+
+    if(forward)
+      {
+	seqPosition=positionsVariant[0]-kmerSize;
+      }else
+      {
+	seqPosition=positionsVariant[0]+1;
+      }
+
+
+    
+    while(!isUnique && seqPosition>=0 && (seqPosition <= (altSeq.length()-kmerSize)) )
+      {
+     
+	bitset<bitSetSize> bitString;
+	bitset<bitSetSize> reversedString; //bit string to hold the reverse complement for the wild type
+	bitset<bitSetSize> bitStringMixed;
+	bitset<bitSetSize> reversedStringMixed; //bit string to hold the reverse complement for the mixed
+
+	
+	//cerr<<"seqPosition is "<<seqPosition<<" alt Seq is "<<altSeq<<endl;
+	//return(0);
+
+	//cerr<<"seq Pos in alt seq is  "<<seqPosition<<endl;
+	string kmerToTest=altSeq.substr(seqPosition, kmerSize);
+    
+	//cerr<<"kmerTo Test is "<<kmerToTest<<endl;
+
+	convertBitString(kmerToTest, kmerSize, bitString); //converting to a bitstring
+	
+	//cerr<<"after convert to Bit String "<<endl;
+
+	if(kmerToTest.empty()) //if failed to convert to a bit string then do not test in hash table
+	  {
+	    //cerr<<"inside railed to convert ***** "<<endl;
+
+	    if(!forward)
+	      {
+		seqPosition--;
+		seqCtr--; //offset from the starting position of the variant
+
+	      }else
+	      {
+		seqPosition++;
+		seqCtr++; //offset from the starting position of the variant
+	      }
+
+
+
+	    continue;
+	  }
+
+	revComplementBitString(reversedString, bitString, clearbitWord, bitTable, bitWord, kmerSize);
+             
+	if(uniqueKmers.count(bitString)>0 || uniqueKmers.count(reversedString)>0)
+	  {
+	    isUnique=true;
+	  
+	  //cerr<<"unique bit string is "<<bit2String(bitString, kmerSize)<<" with a count of "<<uniqueKmers[bitString]<<endl;
+
+	  //getting the reference kmer corresponding to the variant and the mixed kmer
+	    string refKmer, mixedKmer;
+
+	    //cerr<<"In unique Condition before kmer extraction from mixed and ref seqCtr is "<<seqCtr<<endl;
+
+	    //cerr<<"unique sequence is "<<kmerToTest<<endl;
+
+	    if(forward)
+	      {
+		refKmer=wildType.substr(positionsVariant[2]-kmerSize+seqCtr+1, kmerSize); 
+		mixedKmer=mixedSeq.substr(positionsVariant[1]-kmerSize+seqCtr+1, kmerSize); 
+	      
+
+	      }else
+	      {
+
+		//cerr<<"Position in wild type is "<<positionsVariant[2]+seqCtr+1<<" size of wild type is "<<wildType.length()<<endl;
+		//cerr<<"Position in mixed type is "<<positionsVariant[1]+seqCtr+1<<" size of mixed is "<<mixedSeq.length()<<endl;
+		
+		refKmer=wildType.substr(positionsVariant[2]+seqCtr-1, kmerSize); 
+		mixedKmer=mixedSeq.substr(positionsVariant[1]+seqCtr-1, kmerSize); 
+       
+	      }
+
+	    //cerr<<"wild Type is "<<refKmer<<endl;
+	    //cerr<<"mixed is "<<mixedKmer<<endl;
+
+
+	    // cerr<<"In unique Condition after kmer extraction from mixed and ref"<<endl;
 	 
+	    
+	    //cerr<<"positionsVariant is "<<positionsVariant[2]<<" seq Ctr is "<<seqCtr<<" size of sequence is "<<refKmer.size()<<endl;
 
 
+
+	  //cerr<<"ref equnivalent of unique word is "<<refSeq<<" seqPosition is "<<seqPosition<<" startRefSeq is "<<startRefSeq<<endl;
+
+	  //get the reference sequence corresponding to the variant
+	  bitString.reset();
+	  reversedString.reset();
+	  bitStringMixed.reset();
+	  reversedStringMixed.reset();
+
+	  //cerr<<"refKmer is "<<refKmer<<endl;
+	  convertBitString(refKmer, kmerSize, bitString); //converting to bit string the reference word
+
+	  //reverseComplementing the reference kmer
+	  revComplementBitString(reversedString, bitString, clearbitWord, bitTable, bitWord, kmerSize);
+
+	  //cerr<<"mixedKmer is "<<mixedKmer<<endl;
+	  convertBitString(mixedKmer, kmerSize, bitStringMixed); //converting to bit string the mixed word
+	  //reverseComplementing the mixed kmer
+	  revComplementBitString(reversedStringMixed, bitString, clearbitWord, bitTable, bitWord, kmerSize);
+
+
+	  
+	  // int count=allKmers.count(bitString)+allKmers.count(reversedString);
+	  //	    cerr<<"reference bit string is "<<bit2String(bitString, kmerSize)<<" with a count of for reverse "<<allKmers[reversedString]<<" with a count of for + strand "<<allKmers[bitString]<<" sum is "<<temp<<endl;
+	  //	    cerr<<"zygosityCutoff is "<<zygosityCutoff<<endl;
+
+	  
+	  //if( (allKmers.count(bitString)+allKmers.count(reversedString)) > 0 )
+	    
+	      int sum=0;
+	      if(allKmers.count(bitString)>0 && allKmers.count(reversedString)>0 && allKmers.count(bitStringMixed)>0 && allKmers.count(reversedStringMixed)>0)
+		{
+		  sum=allKmers[bitString]+allKmers[reversedString]+allKmers[bitStringMixed]+allKmers[reversedStringMixed];
+		
+		}else if(allKmers.count(bitString)>0)
+		{
+
+		  sum=allKmers[bitString];
+
+		}else if (allKmers.count(reversedString)>0)
+		{
+		  sum=allKmers[reversedString];
+		
+		}else if (allKmers.count(bitStringMixed)>0)
+		{
+		  sum=allKmers[bitStringMixed];
+		
+		}else if (allKmers.count(reversedStringMixed)>0)
+		{
+		  sum=allKmers[reversedStringMixed];
+		}
+
+
+	      if(sum > zygosityCutoff)
+		{
+
+		  //cerr<<"variant is a heterozygoute!! "<<endl;
+		  //cerr<<"reference bit string is "<<bit2String(bitString, kmerSize)<<" with a count of "<<allKmers[bitString]<<endl;
+
+		  return(0);
+		}else
+		{
+	      
+		  //cerr<<"variant is a homozygoute! "<<endl;
+	    
+		  return(1);
+		}
+
+	    
+	  }
+
+
+	if(!forward)
+	  {
+	    seqPosition--;
+	    seqCtr--; //offset from the starting position of the variant
+
+	  }else
+	  {
+	    seqPosition++;
+	    seqCtr++; //offset from the starting position of the variant
+	  }
+	
+
+
+
+      }
+
+  return(2);
+
+
+
+}
 
 
 

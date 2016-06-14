@@ -4,7 +4,7 @@
 #include<sparsehash/sparse_hash_map>
 #include<sparsehash/dense_hash_map>
 #include<bitset>
-#include<fstream>
+//#include<fstream>
 #include<string>
 #include<stdlib.h>
 //#include<boost/dynamic_bitset.hpp>
@@ -21,7 +21,6 @@
 #include <omp.h>
 #include <iostream>
 #include<list>
-#include <unordered_map>
 #include <functional>
 #include <tuple>
 
