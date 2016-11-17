@@ -22,8 +22,9 @@ sub filterContigs($ $ $);
 
 #given a file contianing the alignment for the ends of contigs  find contigs in which the aligned start and end positions are very different 
 #than what they should be input is file name containing aligned ends of contigs in bed format and an integer representing 
-#how different aligned start and end positions should differ
-sub filterContigsVer2($ $ $);
+#how different aligned start and end positions should differ 
+#last argument is the path to a fasta containg the reference genome variants are called againist
+sub filterContigsVer2($ $ $ $);
 
 
 #given a file containing the alignment of contigs find the SNP in the contig sequence and report location and SNP
@@ -62,15 +63,20 @@ my $flag=shift;
 #print "average is $test\n";
 
 
-
 #exit;
+
+#my $genome="/data/Genomes/human19/allChrhg19InOrder.fa";
+
+#my $genome="/data6/sukrit/081216_MiSeq_MMB1newdel_genomeSeq/MappingToReference/MMB1genomeCIRC84.fasta";
+
+my $genome="/data/Genomes/cElegans10/allChr.fa";
+
 
 
 if($flag eq 'filter')
 {
 
-
-    &filterContigsVer2($inputFile, $contigSeq, $cutoff);
+    &filterContigsVer2($inputFile, $contigSeq, $cutoff, $genome);
 
 
     #&filterContigs($inputFile, $contigSeq, $cutoff);
@@ -1125,7 +1131,14 @@ sub getVar_MDstring($)
     $refSeq="";
     $altSeq="";
 
-    $cmd="/data/bin/SamTSV/jvarkit/dist-1.128/sam2tsv -r /data/Genomes/human19/allChrhg19InOrder.fa  $samFile > temp.dat";
+    #$cmd="/data/bin/SamTSV/jvarkit/dist-1.128/sam2tsv -r /data/Genomes/human19/allChrhg19InOrder.fa  $samFile > temp.dat";
+
+    #$cmd="/data/bin/SamTSV/jvarkit/dist-1.128/sam2tsv -r /data6/sukrit/081216_MiSeq_MMB1newdel_genomeSeq/MappingToReference/MMB1genomeCIRC84.fasta  $samFile > temp.dat";
+
+
+    $cmd="/data/bin/SamTSV/jvarkit/dist-1.128/sam2tsv -r /data/Genomes/cElegans10/allChr.fa  $samFile > temp.dat";
+
+
 
     print "#######cmd is $cmd\n\n";
     system($cmd)==0
@@ -1211,10 +1224,10 @@ if(1==1)
 
 	###ONLY USE THIS FOR GENOME IN A BOTTLE###
 
-	if($line!~/chr21/) #only print out variants on chromosome 21
-	{
-	    next;
-	}
+#	if($line!~/chr21/) #only print out variants on chromosome 21
+#	{
+#	    next;
+#	}
 
 	$prevPos=0;
 
@@ -1769,8 +1782,9 @@ sub mergeVariants($ $ $)
 	
 		if($covCounter>0)
 		{
-		    my  $avg=`samtools mpileup -ABr $vcfMatrix[$sameIndex][0]:$regionsStart-$regionsEnd -d 1000000 /data7/PlatinumAlignments/allPlatium.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
+		    #my  $avg=`samtools mpileup -ABr $vcfMatrix[$sameIndex][0]:$regionsStart-$regionsEnd -d 1000000 /data7/PlatinumAlignments/allPlatium.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
 
+		    my $avg=0.001;
 		     $allelFraction=$covCounter/$avg;
 		}else #if all the variants that make the same call come from an impure cluster than do not attempt to make any zygousity calls or allelfraction calculations
 		{
@@ -1885,7 +1899,9 @@ sub mergeVariants($ $ $)
 			$regionsEnd=$vcfMatrix[$i][1]+100;
 
 
-			my  $avg=`samtools mpileup -ABr $vcfMatrix[$i][0]:$regionsStart-$regionsEnd -d 1000000 /data7/PlatinumAlignments/allPlatium.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
+			#my  $avg=`samtools mpileup -ABr $vcfMatrix[$i][0]:$regionsStart-$regionsEnd -d 1000000 /data7/PlatinumAlignments/allPlatium.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
+			my $avg=0.001;
+
 			my $allelFraction=$covCounter/$avg;
 			#print "$allelFraction\n";
 
@@ -2048,26 +2064,26 @@ sub readFastaContig($)
 
 }
 
-sub filterContigsVer2($ $ $)
+sub filterContigsVer2($ $ $ $)
 {
     my $contigsBed=shift;
     my $seq=shift;
     my $cutoff=shift;
-
+    my $genomeFile=shift;
 
     my (@regions, $numContigs, $i, $j, $diff, $header, $line, %firstPart, %endPart, $key, $deletion);
     my ($index, $start, $end, $secondKey, $secondIndex, @temp, $size, $dev, %refSeq, %contigSeqs, $referenceSeq);
     my ($contigID, $refSubSeq, $contigSeq, $matches, $min, $temp, $numCol, @merged, $printString, $varSeq);
 
-    my(@refString, @contigString, $chr, $null, $compareSeq, $minimum, $minIndex, $distance, $refSeq, $length);
+    my(@refString, @contigString, $chr, $null, $compareSeq, $minimum, $minIndex, $distance, $refSeq, $length, $endQuality, %genome);
 
 #    open(OUT, ">inversions.bed");
 
     %contigSeqs=&readFasta($seq);
+    %genome=&readFasta($genomeFile);
 
 
-
-if(1==2)
+if(1==1)
 {
     #header for vcf file
     print "##fileformat=VCFv4.1\n";
@@ -2102,6 +2118,11 @@ if(1==2)
     foreach($i=0; $i<$numContigs; $i++)
     {
 
+	if($regions[$i][4]<30)
+	{
+	    next;
+	}
+
 
 	if($regions[$i][0]=~m/chrUn/)
 	{
@@ -2117,6 +2138,7 @@ if(1==2)
 	if($regions[$i][3]=~m/firstPart/)
 	{
 	    $firstPart{$regions[$i][3]}=$i;
+
 	}elsif($regions[$i][3]=~m/endPart/)
 	{
 	    $endPart{$regions[$i][3]}=$i;
@@ -2205,19 +2227,35 @@ if(1==2)
 	{
 	    #$diff=$regions[$secondIndex][2]-$regions[$index][1];
 	     
-	    $diff=abs($regions[$index][1]-$regions[$secondIndex][2]);
+	    #$diff=abs($regions[$index][1]-$regions[$secondIndex][2]);
+	    
+	    $diff=$regions[$secondIndex][2]-$regions[$index][1];
+
+	    if($contigID=~m/.*1175227.*/)
+	    {
+		my $temp=1;
+	    }
+
+
+
 	     
 	    #@temp=@regions[$index, $secondIndex];
+	    
+
+
+
+
 
 	    $dev=abs($diff-$length);
 	    $start=$regions[$index][2];
 	    $end="$regions[$index][4],$regions[$secondIndex][4];";
-	    
+	    $endQuality="$regions[$index][4],$regions[$secondIndex][4];";
 
 	    #for bed format only
 	    $start=$regions[$index][2];
-	    $end=$regions[$secondIndex][1];
-	
+	    #$end=$regions[$secondIndex][1];
+	    $end=$start;
+
 
 	}    
 
@@ -2226,15 +2264,17 @@ if(1==2)
 
 	if($regions[$index][5] eq "-")
 	{
-	    if($contigID=~m/.*116156.*/)
+	    if($contigID=~m/.*1175227.*/)
 	    {
 		my $temp=1;
 	    }
 
 	    #$diff=$regions[$secondIndex][2]-$regions[$index][1];
 	     
-	    $diff=abs($regions[$index][2]-$regions[$secondIndex][1]);
+	    #$diff=abs($regions[$index][2]-$regions[$secondIndex][1]);
 	     
+	    $diff=$regions[$index][2]-$regions[$secondIndex][1];
+	    
 
 	    #@temp=@regions[$index, $secondIndex];
 
@@ -2242,11 +2282,13 @@ if(1==2)
 	    $dev=abs($diff-$length);
 	    $start=$regions[$secondIndex][2];
 	    $end="$regions[$index][4],$regions[$secondIndex][4];";
+	    $endQuality="$regions[$index][4],$regions[$secondIndex][4];";
 
 	    #for bed format only
 	    $start=$regions[$secondIndex][2];
-	    $end=$regions[$index][1];
-	
+	    #$end=$regions[$index][1];
+	    $end=$start;
+
 	    
 	}
 
@@ -2280,9 +2322,12 @@ if(1==2)
 		}
 
 
-		$start=$start-10;
-		$end=$end+10;
-
+		#uncomment if looking to compare variants across samples
+		if(1==2)
+		{
+		    $start=$start-10;
+		    $end=$end+10;
+		}
 
 
 	#deletion occured
@@ -2292,12 +2337,107 @@ if(1==2)
 		    $referenceSeq=".";
 
 
+
+
+
+
+
 		   
 			    
-		    $printString="$regions[$secondIndex][0]\t$start\t"."."."\t$varSeq\t$referenceSeq\t"."."."\tPASS\tcontig=$contigID;Ends=$end;Length=$dev;Type=deletion";
+		    #$printString="$regions[$secondIndex][0]\t$start\t"."."."\t$varSeq\t$referenceSeq\t"."."."\tPASS\tcontig=$contigID;Ends=$end;Length=$dev;Type=deletion";
 
-		    print "$regions[$index][0]\t$start\t$end\t"."$contigID"."deletionsize_"."$dev\n";
+		    #caculate ratio of heterzyoute versus homozygoute snps for the deleted regions
 
+		    if(1==2)
+		    {
+			open(OUT, ">foo.bed");
+
+			my $temp=$start+$dev;
+		    #my $cmd="echo $regions[$index][0]\t$start\t$temp > foo.dat ";
+		    
+		    #system($cmd)==0
+	#		or die "system $cmd failed\n";
+
+			print OUT "$regions[$index][0]\t$start\t$temp\n";
+
+			close(OUT);
+
+		    #get the heterozygout and homozygout snp count for variants that fall in the deleted regions
+			my $cmd="/data/bin/bedtools2/bin/intersectBed -u -a /data3/GenomeInABottle/ZgosityGenomeInBottleV1.19.bed -b foo.bed > foo2.bed";
+			system($cmd)==0
+			    or die "system $cmd failed\n";
+    
+			my @output=`wc -l < foo2.bed`;
+
+			my ($hetCount, $homoCount, $total, $zygoRatio);
+			
+			if($output[0]>0)
+			{
+			    @output=`grep \"0/1\" foo2.bed | wc -l`;
+			    $output[0]=~m/(\d+).*/;
+			    $hetCount=$1;
+
+			    @output=`grep \"1/1\" foo2.bed | wc -l`;
+			    $output[0]=~m/(\d+).*/;
+			    $homoCount=$1;
+
+
+			    $total=0;
+			    $total=$hetCount+$homoCount;
+
+			    if($homoCount>0)
+			    {
+				$zygoRatio=$hetCount/$homoCount;
+				$zygoRatio=$zygoRatio."/".$hetCount."/".$homoCount;
+
+			    }else
+			    {
+				$zygoRatio=-1;
+				$zygoRatio=$zygoRatio."/".$hetCount."/".$homoCount;
+
+
+			    }
+		       			
+			}else
+			{
+			    $zygoRatio=-1;
+			    $zygoRatio=$zygoRatio."/"."0"."/"."0";
+
+			}
+
+			print "$regions[$index][0]\t$start\t$end\t"."$contigID"."ZygosityRatio".$zygoRatio."deletionsize_"."$dev\n";
+		    
+
+		    }
+
+
+#		    print "##fileformat=VCFv4.1\n";
+#		    print "##INFO=<ID=Contig, Number=1, Type=String, Description=\"Contig id the variant was derived from\">\n";
+#		    print "##INFO=<ID=Ends, Number=2, Type=Integer, Description=\"The mapping quality of the two ends of the contig\">\n";
+#		    print "##INFO=<ID=Length, Number=1, Type=Integer, Description=\"The length of the indel\">\n";
+#		    print "##INFO=<ID=Type, Number=1, Type=String, Description=\"The type of indel\">\n";
+#		    print "##INFO=<ID=SVTYPE, Number=1, Type=String, Description=\"The type of indel for indels larger than 15 bps\">\n";
+#		    print "##INFO=<ID=SVLEN, Number=1, Type=Integer, Description=\"The size of the indel\">\n";
+#		    print "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+		
+		    #$varSeq=".";
+		    #$referenceSeq=".";
+
+
+		    $varSeq=uc(substr($genome{$regions[$secondIndex][0]}, $start, 1) );
+		    $referenceSeq=uc(substr($genome{$regions[$secondIndex][0]}, $start, $dev));
+
+		    if($dev>1000000)
+		    {
+			next;
+		    }
+
+
+		    $printString="$regions[$secondIndex][0]\t$start\t"."."."\t$referenceSeq\t$varSeq\t"."."."\tPASS\tcontig=$contigID;Ends=$endQuality;Length=$dev;Type=deletion\tGT\t1|1";
+
+		    #print "$dev\n";
+
+		    print "$printString\n";
 		    
 		    #print "$regions[$index][0]\t$start\t$end\n";
 
@@ -2317,13 +2457,18 @@ if(1==2)
 		    $varSeq=".";
 		    $referenceSeq=".";
 
-		    print "$regions[$index][0]\t$start\t$end\t"."$contigID"."insertionsize_"."$dev\n";
+		    #print "$regions[$index][0]\t$start\t$end\t"."$contigID"."insertionsize_"."$dev\n";
+
+		    #$varSeq=uc(substr($genome{$regions[$secondIndex][0]}, $start, 1) );
+		    #$referenceSeq=uc(substr($genome{$regions[$secondIndex][0]}, $start, $dev));
 
 		    
 
 		    #print "$regions[$index][0]\t$start\t$end\n";
 
-		    #$printString="$regions[$secondIndex][0]\t$start\t"."."."\t$varSeq\t$referenceSeq\t"."."."\tPASS\tcontig=$contigID;Ends=$end;Length=$dev;Type=insertion";
+		    $printString="$regions[$secondIndex][0]\t$start\t"."."."\t$varSeq\t$referenceSeq\t"."."."\tPASS\tcontig=$contigID;Ends=$end;Length=$dev;Type=insertion\tGT\t1|1";
+
+		    print "$printString\n";
 
 		}
 		   

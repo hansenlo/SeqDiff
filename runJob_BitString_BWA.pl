@@ -3,6 +3,8 @@
 use strict; 
 use warnings;
 use Devel::Size qw(size total_size);
+use List::Util 'max';
+use List::Util qw(sum);
 
 do "/home/hansenlo/Code/usefulFunctions.pl";
 die $@ if $@;
@@ -16,13 +18,18 @@ my $controlFile=shift; #the file containing the control reads if present
 #given a contig file and a cutoff indicating how much to start aligning from each end
 #iteratively increase the size of the end alignments until you get a unique alignment or you reach
 #a preset size limit
-sub iterativeAlignment($ $ $ $ $);
+sub iterativeAlignmentLocal($ $ $ $ $ $);
 
 
 #given a set of contig edges that align uniquely 
 #extend the contig edges until they reach a cutoff number of mismatches with the reference
 #arguments are contig edges cutoff reference genome and contig seq
-sub extendAlignments($ $ $ $);
+sub extendAlignmentsLocal($ $ $ $);
+
+#given a contig alingnment file and a contig fasta file select those contigs that align with substantial soft or hard clipping or do not align at all
+#output is a fasta file also given is the cutoff number of bases that need to be soft or hard clipped.  
+sub filterAlignmentsLocal($ $ $);
+
 
 #Program to take as input a file name containing a read library and running all commands on it
 
@@ -57,8 +64,9 @@ $path=$1."/";
 
 #$blastDB="/data/Bowtie2Index/hg19GATK";
 
-$blastDB="/data/BwaIndex/allChrhg19InOrder.fa";
-
+#$blastDB="/data/BwaIndex/allChrhg19InOrder.fa";
+$blastDB="/data/BwaIndex/allChr_cElegans10.fa";
+#$blastDB="/data6/sukrit/081216_MiSeq_MMB1newdel_genomeSeq/MappingToReference/MMB1genomeCIRC84.fasta";
 
 
 if(1==1)
@@ -83,7 +91,7 @@ $outputUnique=$header.".fastq";
 
 
 
-if(1==2)
+if(1==1)
 {
 
 #getting those reads that passed the filter running the code
@@ -97,7 +105,7 @@ if(1==2)
 
 #$cmd="time ./findDiff_BitString_HashTableVer $controlFile $file  31 0 $cutoff temp.dat > "."/home/hansenlo/SeqDiff/Results/".$outputUnique;
 
-$cmd="time ./variantFinder $expKmerCounts $expFastq 45";
+$cmd="time ./variantFinder $expKmerCounts $expFastq 31 > temp.dat";
 
 #$cmd="time ./temp $controlFile $file  31 0 $cutoff temp.dat > "."/data7/SeqDiffResults/Results/".$outputUnique;;
 
@@ -123,7 +131,7 @@ system($cmd)==0
 
 
 #copying sequence to appropriate places
-if(1==2)
+if(1==1)
 {
 #move contigs to appropriate directory
 $cmd="cp /home/hansenlo/SeqDiff/gitHubProject/SeqDiff/contigs.fa /data5/SeqDiffResults/Results/".$header."_contigs.fasta";
@@ -291,7 +299,7 @@ system($cmd)==0
 }
 
 
-if(1==2)
+if(1==1)
 {
 
 
@@ -385,8 +393,6 @@ system($cmd)==0
 
 
 
-if(1==2)
-{
 ######################Aligning the contigs#####################
 #$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."refGenomeOnly_contigEdges.sam";
 
@@ -394,6 +400,8 @@ $alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."_contigs.sa
 
 my $contigs="/data5/SeqDiffResults/Results/".$header."_contigs.fasta";
 
+if(1==1)
+{
 
 #$cmd="rm /data5/SeqDiffResults/Results/Alignment/".$header."*contigs*";  ##############Be careful with THIS!!!!! make sure you are not deleting the wrong files!!!!
 
@@ -462,9 +470,10 @@ system($cmd)==0
     or die "system $cmd failed\n";
 
 
-##Getting the contigs that mapped with poor mapping quality i.e. mapping quality < 8
 my $tempOutPoorMap="/data5/SeqDiffResults/Results/Alignment/".$contigheader."_poorlyMapped.sam";
-$cmd="time samtools view -h $tempIn".'| awk \'{if(\$1 ~ /^@/) {print \$0} else if(\$5<8) {print \$0}}\' |'."samtools view -hSo $tempOutPoorMap -";
+#$cmd="time samtools view -h $tempIn".'| awk \'{if(\$1 ~ /^@/) {print \$0} else if(\$5<8) {print \$0}}\' |'."samtools view -hSo $tempOutPoorMap -";
+
+$cmd="time samtools view -h $tempIn".'| awk \'{if($5<8) {print $0}}\' |'."samtools view -hSo $tempOutPoorMap -";
 print "#######cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
@@ -527,12 +536,28 @@ system($cmd)==0
 
 #######################now working with contig edges###################
 
+    my $alignmentFile=shift;
+    my $cutoff=shift;
+    my $contigFile=shift;
+
+print "starting to filter the alignments \n";
+
+&filterAlignments($alignmentOutput, 0.2, $contigs);
+
+
 print "Starting iterative alignment\n";
 #iterativeAlignment($tempOutunMappPoorMap, 20, 80,  $blastDB, $header);
 
 #&iterativeAlignment("/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs_unMapped_poorlyMapped.fasta", 20, 80,  $blastDB, $header);
 
-&iterativeAlignment("/data5/SeqDiffResults/Results/unique_platinumChr21_plusUnmapped_contigs.fasta", 20, 80,  $blastDB, $header);
+#&iterativeAlignment("/data5/SeqDiffResults/Results/unique_platinumChr21_plusUnmapped_contigs.fasta", 20, 80,  $blastDB, $header);
+
+#&iterativeAlignment("/data5/SeqDiffResults/Results/unique_allPlatinum_contigs.fasta", 20, 80,  $blastDB, $header);
+
+my $mappingQualityCutoff=35;
+&iterativeAlignment("clippedContigs.fa", 20, 60,  $blastDB, $header, $mappingQualityCutoff);
+
+#&iterativeAlignment($contigs, 20, 180,  $blastDB, $header, $mappingQualityCutoff);
 
 
 print "Starting to extend alignments\n";
@@ -542,7 +567,17 @@ print "Starting to extend alignments\n";
 
 #&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs_unMapped_poorlyMapped.fasta");
 
-&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/unique_platinumChr21_plusUnmapped_contigs.fasta");
+#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/unique_platinumChr21_plusUnmapped_contigs.fasta");
+
+#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/unique_allPlatinum_contigs.fasta");
+
+#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", $contigs);
+
+&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/cElegans10/allChr.fa", $contigs);
+
+#&extendAlignments("mappedReads_IDs.dat", 2, "/data6/sukrit/081216_MiSeq_MMB1newdel_genomeSeq/MappingToReference/MMB1genomeCIRC84.fasta", $contigs);
+
+
 
 
 if(1==2)
@@ -666,6 +701,8 @@ system($cmd)==0
 if(1==2)
 {
 
+    $controlFile=$expFastq;
+
 @splitLine=split(/\//,$controlFile);
 
 print "$splitLine[$#splitLine]\n";
@@ -743,14 +780,14 @@ system($cmd)==0
 
 
 
-sub iterativeAlignment($ $ $ $ $)
+sub iterativeAlignmentLocal($ $ $ $ $ $)
 {
     my $contigs=shift;
     my $startSize=shift;
     my $endSize=shift;
     my $blastDB=shift;
     my $header=shift;
-
+    my $mappingCutoff=shift;
 
     my(@samOutput, $flag, $size, $i, @readsToReAlign, %contigs, $contigID, $locationContigs, $j);
     my($seq, $ctr, $start, $end, $strand, %multi, $key, $k, $l, $rowSize);
@@ -789,6 +826,11 @@ sub iterativeAlignment($ $ $ $ $)
     	#getting contig edges
     $cmd="time perl VariantPerlScripts.pl $contigs $startSize temp.dat extract  > needToBeMapped.fasta";
 
+    #$cmd="time perl VariantPerlScripts.pl $contigs 100 temp.dat extract  > needToBeMapped.fasta";
+
+    
+
+
     print "#######cmd is $cmd\n\n";
     system($cmd)==0
 	or die "system $cmd failed\n";
@@ -796,8 +838,9 @@ sub iterativeAlignment($ $ $ $ $)
 
     #exit;
 
+    my ($needsMappedCtr);
 
-
+    $needsMappedCtr=10;
     for($j=$startSize+1; $j<=$endSize; $j++)
     {
 
@@ -814,19 +857,26 @@ sub iterativeAlignment($ $ $ $ $)
 
 #	$cmd="time /data/bin/bwa-master/bwa mem -t 20 $blastDB"." needToBeMapped.fasta > $alignmentOutput"; #this command will not work with reads shorter than about 70 bps
 
+	#if entire set of contigs map then exit out of loop 
+	if($needsMappedCtr==0)
+	{
+	    last;
+	}
+
+
 #bwa commands to run alignment on short reads and covert to sam format
-	$cmd="time /data/bin/bwa-master/bwa aln -t 20 /data/BwaIndex/allChrhg19InOrder.fa needToBeMapped.fasta > reads.sai";
+	$cmd="time /data/bin/bwa-master/bwa aln -t 20 $blastDB needToBeMapped.fasta > reads.sai";
 	print "#######cmd is $cmd\n\n";
 	system($cmd)==0
 	    or die "system $cmd failed\n";
 
-	$cmd="time /data/bin/bwa-master/bwa samse /data/BwaIndex/allChrhg19InOrder.fa reads.sai needToBeMapped.fasta > $alignmentOutput";
+	$cmd="time /data/bin/bwa-master/bwa samse $blastDB reads.sai needToBeMapped.fasta > $alignmentOutput";
 	print "#######cmd is $cmd\n\n";
 	system($cmd)==0
 	    or die "system $cmd failed\n";
 
 	
-
+	#exit;
 	
 	open(my $needMapped, ">needToBeMapped.fasta");
 
@@ -856,6 +906,8 @@ sub iterativeAlignment($ $ $ $ $)
 	    exit;
 	}
 
+
+	$needsMappedCtr=0;
 
 	for($i=0; $i<$size; $i++)
 	{
@@ -915,7 +967,7 @@ sub iterativeAlignment($ $ $ $ $)
 	    #also checking to make sure no soft clipping by looking for S in Cigar string
 #bowtie mapping quality	    
 #if($samOutput[$i][4]>15)
-	    if($samOutput[$i][4]>40 && $samOutput[$i][5]!~/S/)
+	    if($samOutput[$i][4]>35 && $samOutput[$i][5]!~/S/)
 	    {
 	    
 
@@ -972,6 +1024,8 @@ sub iterativeAlignment($ $ $ $ $)
 
 		print $needMapped ">$samOutput[$i][0]\n";
 		
+		$needsMappedCtr=$needsMappedCtr+1;
+
 		#extract first part of contig copy to needs mapped file
 		if($samOutput[$i][0]=~m/firstPart/)
 		{
@@ -996,7 +1050,7 @@ sub iterativeAlignment($ $ $ $ $)
     }
 
     close willNotMap;
-
+    close wasMapped;
 
     #adding final set of non unique mappings
     open(noMap, ">>finalMultiMapping.bed");
@@ -1052,7 +1106,7 @@ sub iterativeAlignment($ $ $ $ $)
 }
 
 
-sub extendAlignments($ $ $ $)
+sub extendAlignmentsLocal($ $ $ $)
 {
     my $edges=shift;
     my $cutoff=shift;
@@ -1415,3 +1469,113 @@ sub readFastaContig($)
     return(%seqResults);
 
 }
+
+sub filterAlignmentsLocal($ $ $)
+{
+
+    my $alignmentFile=shift;
+    my $cutoff=shift;
+    my $contigFile=shift;
+
+    
+
+
+    my(@samOutput, %contigs, $size, %hardClipped, $i, $cigarString, $sizeClippingFirst, $sizeClippingLast, $sizeContig, $fractionClipped, @allMatches, $sizeClipping);
+    my($maxSclipping, $maxHclipping, $sizeSContig, $sizeHContig, $maxClipped, $contigSize);
+
+    open(my $clipped, ">clippedContigs.fa");
+
+
+    @samOutput=&parseSamFile($alignmentFile);
+
+    %contigs=&readFasta($contigFile);
+
+    $size=@samOutput;
+    
+    for($i=0; $i<$size; $i++)
+    {
+	if($samOutput[$i][0]=~m/^\@/)
+	{
+	    next;
+	}
+	
+#	$sizeClipping=-1;
+	$maxSclipping=-1;
+	$maxHclipping=-1;
+	$sizeSContig=-1;
+	$sizeHContig=-1;
+	$sizeContig=-1;
+	$maxClipped=-1;
+
+	$cigarString=$samOutput[$i][5];
+
+	if($cigarString=~m/(\d+)S/)
+	{
+	    @allMatches=$cigarString=~m/(\d+)S/g; #getting all soft clipped bases from both ends 
+
+	    $maxSclipping=max(@allMatches); #getting the max amount of soft clipped bases
+
+	    #$sizeClipping=$1;
+	    $sizeSContig=length($samOutput[$i][9]); #getting the length of the soft clipped contig
+
+	   
+	    
+	}
+	
+	if($cigarString=~m/(\d+)H/)
+	{
+	    #$sizeClipping=$1;
+	    
+	    @allMatches=$cigarString=~m/(\d+)H/g; #getting all hard clipped bases from both ends 
+
+	    $maxHclipping=max(@allMatches); #getting the max amount of hard clipped bases
+
+	    #$sizeClipping=$1;
+	    $sizeHContig=length($samOutput[$i][9]) + sum(@allMatches); #getting the length of the hard clipped contig
+
+
+	}
+
+	if($maxHclipping<$maxSclipping)
+	{
+	    $maxClipped=$maxSclipping;
+	}else
+	{
+	    $maxClipped=$maxHclipping;
+	}
+	
+	if($sizeHContig<$sizeSContig)
+	{
+	    $sizeContig=$sizeSContig;
+
+	}else
+	{
+	    $sizeContig=$sizeHContig;
+
+	}
+
+
+
+
+	    if(!defined($sizeClipping))
+	    {
+		my $temp;
+	    }
+
+	    if(($maxClipped/$sizeContig)>=$cutoff && $maxClipped > 0)
+	    {
+		print $clipped ">".$samOutput[$i][0]."\n";
+		print $clipped "$contigs{$samOutput[$i][0]}\n";
+
+		
+	    }
+
+
+    }
+
+    
+
+}
+
+
+

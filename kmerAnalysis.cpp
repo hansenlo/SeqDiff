@@ -1379,9 +1379,8 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 
 		  //if any unique kmer is larger than the cutoff do not use that read
-		  if(iter->second > 254 || revIter->second > 254)
+		  if(iter->second > 2000 || revIter->second > 2000)
 		    {
-		    
 		      break;
 		    }
 
@@ -2257,17 +2256,17 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
      		  
        
       //cout<<totalCtr<<endl;
-      if(totalCtr % 10000000==0)
-	{	  
+		  if(totalCtr % 10000000==0)
+		    {	  
 	  //	  cerr<<"lines processed from input file "<<totalCtr<< " number of clusters is "<<readClusters.size()<<endl;
 	
-         #pragma omp critical(PRINT_UPDATE)
-	  {
+#pragma omp critical(PRINT_UPDATE)
+		      {
 
-	    cerr<<"lines processed from input file "<<totalCtr<<"   number of cluster kmers is "<<clusterKmers.size()<<"\n";
-	    cerr<<"number of clusters is "<<clusterFiles.size()<<"\n";
-	  
-	  }
+			cerr<<"lines processed from input file "<<totalCtr<<"   number of cluster kmers is "<<clusterKmers.size()<<"\n";
+			cerr<<"number of clusters is "<<clusterFiles.size()<<"\n";
+			
+		      }
 //cerr<<"number of chunks of work is "<<workList.size()<<endl;
   //cerr<<"number of reads assigned to clusters are "<<clusterBuffer.size()<<"\n";
 	  //cerr<<"number of clusters is "<<clusterFiles.size()<<"\n";
@@ -2286,7 +2285,7 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
 
 	  //return(0);
 	 
-	}
+		    }
    
      
       //continue;
@@ -2480,7 +2479,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
   #pragma omp critical(DEBUGGING_GETCLUSTER)
 	{
-	  cerr<<"thread "<<tid<<" is working on file "<<fileName<<endl;
+	  cout<<"thread "<<tid<<" is working on file "<<fileName<<endl;
 	}
 
 
@@ -2527,14 +2526,19 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	  exit(EXIT_FAILURE);
 	}
 
-      
 
       while(clusterFile.good())  //read in all the clusters
 	{
       
 
 	  getline(clusterFile, line);
-        
+	  
+
+	  if(line.size()==0)
+	    {
+	      continue;
+	    }
+
       //object will convert string to a stream so can use things like getline on it
 	  istringstream iss(line);
       
@@ -2606,6 +2610,8 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
       double ratio;
 
+      
+
       /*
 #pragma omp critical(DEBUGGING_READINCLUSTER)
       {
@@ -2640,8 +2646,9 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	  //auto last=unique(iter->second->begin(), iter->second->end());
 	  //iter->second->erase(last, iter->second->end());
 	  
-	  //number of reads in cluster cutoff
-	  if(iter->second->size()>=cutoffClusterSize)
+	  //number of reads in cluster cutoff also making sure the cluster size is not to large. To large of a cluster 
+	  //is suspicious could be adapter sequcence contamination or bacteria etc. 
+	  if(iter->second->size()>=cutoffClusterSize && iter->second->size()<=10000)
 	    {
 
 
@@ -2739,7 +2746,6 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
       
 
       
-      
 #pragma omp critical(FLUSHING_CLUSTER) //flush last contigs left in buffer to a file
 	      {
 		long z;
@@ -2781,6 +2787,13 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 		  delete hashIter->second;
 		}
 	      */
+
+#pragma omp critical(EXITING_GETCLUSTER)
+	{
+	  cout<<"thread "<<tid<<" finished working on  "<<fileName<<endl;
+	  cout<<endl;
+	}
+
 
       
       

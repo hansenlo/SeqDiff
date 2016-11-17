@@ -187,7 +187,7 @@ int main(int argc, char *argv[] )
   cerr<<"starting to read in unique kmers "<<endl;
 
   //8 is the kmer count cutoff
-  readUniqueKmers(uniqueKmers, continueFlag, uniqueExpKmerCountFile, kmerSize, 8); //Need to uncomment for code to work
+  readUniqueKmers(uniqueKmers, continueFlag, uniqueExpKmerCountFile, kmerSize, 3); //Need to uncomment for code to work
 
   
   //return(0);
@@ -274,10 +274,10 @@ int main(int argc, char *argv[] )
 	  //cerr<<"currentClusterFilePrivate index is "<<currentClusterFilePrivate<<endl;
 
 
-	//4 is the cutoff number of reads 
+	//3 is the cutoff number of reads 
 	//20 is the kmer size used to assemble the reads into a contig
 	
-	readInCluster(fileNames[currentClusterFilePrivate], 4, 25, tid, contigOut, clusterID, debuggingMatrix);
+	readInCluster(fileNames[currentClusterFilePrivate], 3, 25, tid, contigOut, clusterID, debuggingMatrix);
 
 	  // readInCluster(fileNames[1], 4, 20, tid);
 	 

@@ -31,3 +31,21 @@ sort -s -n -k 4,4 extendedContigEdges.bed  > temp.dat
 #command to add chr to first line of a file
 sed -e 's/^/chr/' file
 
+
+#commands to filter vcf files on indel size
+
+#first if using vcf files derived from artifical data add these lines at top of vcf file
+##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+
+#then sort using picard tools 
+time java -jar /data/bin/picard-tools-2.1.1/picard.jar SortVcf I=out/allIndels_only.recode.WithChr.vcf O=out/allIndels_only.recode.WithChr.sorted.vcf SEQUENCE_DICTIONARY=/data/Genomes/human19/allChrhg19InOrder.dict
+
+#then filter using GATK this command will get all indels larger than 20 bp
+#addining in the -U ALLOW_SEQ_DICT_INCOMPATIBILITY because GATK is a pain in the ass to use :( 
+
+time java -jar /data/bin/GenomeAnalysisTK.jar -T SelectVariants -R /data/Genomes/human19/allChrhg19InOrder.fa -V out/allIndels_only.recode.WithChr.sorted.vcf -o SV_GreaterThan20bp.vcf   -U ALLOW_SEQ_DICT_INCOMPATIBILITY -selectType INDEL --minIndelSize 21
+
+
+#this command will get all deletions larger than 20
+time java -jar /data/bin/GenomeAnalysisTK.jar -T SelectVariants -R /data/Genomes/human19/allChrhg19InOrder.fa -V allIndels_only.recode.WithChr.sorted.vcf -o SV_GreaterThan20bp.vcf   -U ALLOW_SEQ_DICT_INCOMPATIBILITY -selectType INDEL -select 'vc.getIndelLengths().0 < -20'  --minIndelSize 21
