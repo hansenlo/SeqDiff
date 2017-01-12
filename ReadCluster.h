@@ -23,6 +23,7 @@
 #include<list>
 #include <functional>
 #include <tuple>
+#include<sstream>
 
 #include "utilities.h"
 
