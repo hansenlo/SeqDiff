@@ -101,10 +101,18 @@ void printBitString(std::vector <uint_fast64_t> &controlCtr1, std::vector <uint_
 //*******IMPORTANT******* bit reversal is for nucleotide strings!!! don't use bit reversal as universal reversal table*********
 void createBitRevTable(int word, std::vector< std::bitset<bitSetSize> > &bitTable);
 
-
+//function to create a bit rev lookup table for use 
+//in reverse complementing a nucleotide string
+//arguments are the word size you want to reverse i.e. 8 bits 16 bits etc 
+//and the lookup table which will be populated
+//*******IMPORTANT******* bit reversal is for nucleotide strings!!! don't use bit reversal as universal reversal table*********
+//function to create a bit reversal table in the context of a machine word of 64 bits only 
+void createBitRevTableMachineWord(int word, std::vector<uint_fast32_t> &bitTable);
 
 void revComplementBitString(std::bitset<bitSetSize> &reversedKey, std::bitset<bitSetSize> &key, std::bitset<bitSetSize> &clearbitWord, std::vector< std::bitset<bitSetSize> > &bitTable, int bitWordSize, int kmerSize);
 
+
+void revComplementMachineWord(uint_fast64_t &key, uint_fast64_t &revKey, int clusterKmerSize, std::vector<uint_fast32_t> &bitTable);
 
 void readInFasta(std::unordered_map<std::string, std::string> &genome, std::string fileName); //function to read in a multi fasta file and store it in a hash table
 

@@ -40,18 +40,18 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		    uint_fast64_t &clusterCtr, //count of how many clusters there currently are will be shared among threads
 		    int tid, //thread id number passing this for debugging purposes
 		    int numFiles, //number of files to print clusters to
-		    google::dense_hash_map<long, long, stdHash> &linkClusters  //hash table key is a cluster id the value is the cluster id that the key cluster should be merged with 
+		    std::unordered_map<double, double > &linkClusters //hash table key is a cluster id the value is the cluster id that the key cluster should be merged with  
 		    );
 
 void sendClustersToFile(std::string &uniqueReadFile, //the file location where all the reads containing novel words were placed 
 			google::dense_hash_map<uint_fast32_t, int, stdHash> &clusterFiles,  //hash table key is a cluster id value is the index into the vector of output file names
 			std::vector<std::shared_ptr<std::ofstream> > &files, //set of opened file handlers that clusters will be written to
-			google::dense_hash_map<long, long, stdHash> &linkClusters,  //hash table key is a cluster id the value is the cluster id that the key cluster should be merged with 
+			std::unordered_map<double, double > &linkClusters,  //hash table key is a cluster id the value is the cluster id that the key cluster should be merged with 
 			int numFiles ); //number of files to print clusters to
 
 //hash table key is a cluster id the value is the cluster id that the key cluster should be merged with 
 //function will take a hash table of links to clusters and flag any clusters which have to many links to other clusters by putting a -1 for the value
-void filterClusters(google::dense_hash_map<long, long, stdHash> &linkClusters, //hash table key is a cluster id the value is the cluster id that the key cluster should be merged with 
+void filterClusters(std::unordered_map<double, double > &linkClusters, //hash table key is a cluster id the value is the cluster id that the key cluster should be merged with 
 		    int maxConnectivity); //max number of clusters that can be connected any more connections and the cluster is flagged as a bad cluster
 
 

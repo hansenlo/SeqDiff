@@ -402,3 +402,79 @@ void readInFasta(std::unordered_map<std::string, std::string> &genome, string fi
 
 }
 
+//function to create a bit rev lookup table for use 
+//in reverse complementing a nucleotide string
+//arguments are the word size you want to reverse i.e. 8 bits 16 bits etc 
+//and the lookup table which will be populated
+//*******IMPORTANT******* bit reversal is for nucleotide strings!!! don't use bit reversal as universal reversal table*********
+//function to create a bit reversal table in the context of a machine word of 64 bits only 
+void createBitRevTableMachineWord(int word, std::vector<uint_fast32_t> &bitTable)
+{
+
+  unsigned long long int size=pow(2, word);
+  unsigned long long int i, j, revBitStr;
+  unsigned long long int temp=0;
+  
+
+  //create appropriate bit string to reset 
+  unsigned long long int reset=pow(2,word)-1;
+
+  //std::vector<uint_fast64_t> bitTable(size);
+
+  //loop though all numbers that can be created with word size of bits
+  for(i=0; i<size; i++)
+    {
+      revBitStr=0;
+
+      /*
+      if(i % 10000000==0)
+	{
+	  cerr<<"number of integers reversed  is "<<i<<endl;
+	}
+      */
+
+      //dynamic_bitset<> bitRepKey(64, i);
+      //cout<<bitRep<<endl;
+      //cout<<"bit string key is "<<"  "<<i<<" "<<bitRepKey<<endl;
+
+      for(j=0; j<word; j+=2)
+	{
+	  //shift two bits into first two bit positions
+	  //clear all other bits
+	  temp=(i>>j)&3;
+
+	  //move the two bits being examined into the proper reverse positions
+	  temp<<=(word-j-2);
+  
+	  //set the two bits in the rev string to the proper pair of bits
+	  revBitStr|=temp;
+	 
+	  //dynamic_bitset<> bitRepKeyRev(64, revBitStr);
+	  //cout<<bitRep<<endl;
+	  //cout<<"bit string key is "<<"  "<<revBitStr<<" "<<bitRepKeyRev<<endl;
+
+	}
+      
+      revBitStr=~revBitStr;
+      revBitStr&=reset;
+
+      //std::bitset<64> x(revBitStr);
+      //cout<<x<<endl;
+      bitTable[i]=revBitStr;
+    }
+
+  //return(bitTable);
+}
+
+void revComplementMachineWord(uint_fast64_t &key, uint_fast64_t &revKey, int clusterKmerSize, std::vector<uint_fast32_t> &bitTable)
+{
+
+  
+  revKey = (bitTable[key & 0xffff] << 48) | 
+    (bitTable[(key >> 16) & 0xffff] << 32) | 
+    (bitTable[(key >> 32) & 0xffff] << 16) |
+    (bitTable[(key >> 48) & 0xffff]);  
+
+  revKey=revKey>>(64-clusterKmerSize*2);
+
+}

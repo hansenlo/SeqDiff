@@ -99,6 +99,7 @@ void ReadCluster::printReads()
   */
 }
 
+
 //kmer size and a cutoff representing the minimum number of times the max nucleotide must occur to be counted
 void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, int cutoffMinNuc, std::ofstream &debugging, vector<string> &clusterID)
 {
@@ -1068,7 +1069,10 @@ uint_fast64_t ReadCluster::getKmers()
 
   uint_fast64_t kmer, positionCtr, AbitString, CbitString, GbitString, TbitString; 
   long  i, j, k;
-  
+
+  kmerPositions.clear();
+  kmerInReadCounts.clear();
+
 
   string validChar = "ACGTacgtN";
   string DNAchar="ACGTacgt";
@@ -1256,10 +1260,12 @@ uint_fast64_t ReadCluster::getKmers()
 
   }
 
+
   
   signed long max=-1;
   uint_fast64_t maxKmer=0;
 
+  
 
   //going through hash table which counts the number of times a kmer is found in the population of reads obtaining the kmer that occurs most often
   auto iterHash=kmerInReadCounts.begin();
@@ -1295,6 +1301,211 @@ uint_fast64_t ReadCluster::getKmers()
 
 }
 
+//before calling this function make sure getKmers and setStartPositions has already been called
+void ReadCluster::revCompCluster(uint_fast64_t maxKmer)
+{
+
+  
+  uint_fast64_t key, revKey;
+ 
+  
+  //building the look up table to reverse nucleotide bit strings
+   int bitWord=16;
+   std::vector<uint_fast32_t> bitTable(pow(2,bitWord));
+
+   //createBitRevTableMachineWord(bitWord, bitTable);
+
+   createBitRevTableMachineWord(bitWord, bitTable);
+
+
+   revKey=0;
+   revComplementMachineWord(maxKmer, revKey, clusterKmerSize, bitTable);
+    
+   vector<bool> flipped(sameStrand.size(), false); //this is to keep track of those reads that have been reversed complemented if a read has been reverse complemented and another read matches it 
+   //then you know the other read should also be reverse complemented
+   
+
+
+   //iterating through the set of reads asking if the reverse complement of the max kmer is present in any reads if it is then reverse complement the read and its quality
+  auto iter=kmerPositions.begin(); //vectorIterator
+  long ctr=0;
+    for(iter; iter!=kmerPositions.end(); iter++)
+      {
+	
+	auto Hashiter=(*iter).find(revKey); //look for the kmer in the hash table that contains every kmer for the given read
+	if(Hashiter!=(*iter).end()) //kmer present in read
+	  {
+	    if(sameStrand[ctr]==false)
+	      {
+		sameStrand[ctr]=true; //if have not already assembled this read into the cluster
+		revComplement(readSeqs[ctr]); //reverse complement and replace the orginal sequence
+		std::reverse(qualityStrings[ctr].begin(), qualityStrings[ctr].end()); //reverse the quality scores
+		flipped[ctr]=true;
+
+	      }
+	  }
+
+	ctr++;
+     }
+
+
+    /*    
+    int x;
+    for(x=0; x!=sameStrand.size(); x++)
+      {
+
+	cerr<<sameStrand[x]<<endl;
+       
+      }
+    
+
+    */
+
+    /*   
+   int y;
+   for(y=0; y!=readSeqs.size(); y++)
+     {
+
+       cerr<<readSeqs[y]<<endl;
+
+     }
+    */
+
+
+
+    ctr=0;
+    bool foundFlag=false;
+    int i, j;
+    uint_fast64_t unknownKmer, unknownRevKmer;
+    uint_fast32_t ctrUnassigned=1;
+    uint_fast32_t ctrUnassignedPrev=1000;
+
+
+    //if all the reads 
+    while(ctrUnassigned!=0 && (ctrUnassignedPrev!=ctrUnassigned))
+      {   
+	ctrUnassigned=ctrUnassignedPrev;
+
+	for(i=0; i!=sameStrand.size(); ++i)
+	  {
+	    ctrUnassigned=0;
+
+	    if(sameStrand[i]==false)
+	      {
+		foundFlag=false;
+
+	    //look at every kmer on the read for which the strand is not known try and find a match for reads on which the strand is known
+		auto HashIter=kmerPositions[i].begin();
+		for(HashIter; HashIter!=kmerPositions[i].end(); HashIter++)
+		  {
+		    if(foundFlag) //if have already found a matching kmer break out of loop
+		      {
+			break;
+		      }
+	      
+		    unknownKmer=HashIter->first;
+
+
+		    for(j=0; j!=kmerPositions.size(); ++j) //go through every read looking for ones that the strand is known 
+		      {
+			if(sameStrand[j]==true) //if a read has been assigned a strand check to see if it has a kmer in common with the unknown strand read
+			  {
+			    auto findIter=kmerPositions[j].find(unknownKmer); //look for kmer in hash table
+		      
+			    if(findIter!=kmerPositions[j].end()) //kmer is present on the same strand
+			      {
+				sameStrand[i]=true;
+				foundFlag=true;
+				//cerr<<"on same strand for unkonwn read "<<i<<" it matches read "<<j<<endl;
+
+			      //if the read that there is a match to has itself been reverse complemented than rev complement the unknown read to match 
+			      if(flipped[j]==true)
+				{
+				  //				  cerr<<"on same strand for unkonwn read  rev complemtned "<<i<<" it matches read "<<j<<endl;
+				      
+
+				  revComplement(readSeqs[i]); //reverse complement and replace the orginal sequence
+				  std::reverse(qualityStrings[i].begin(), qualityStrings[i].end()); //reverse the quality scores
+				  
+				  flipped[i]=true;
+
+				}
+
+				break;
+			      }
+
+			    unknownRevKmer=0;
+			    revComplementMachineWord(unknownKmer, unknownRevKmer, clusterKmerSize, bitTable);
+			    auto findIterRev=kmerPositions[j].find(unknownRevKmer); //look for kmer in hash table
+		      
+			    if(findIterRev!=kmerPositions[j].end()) //kmer is present on the opposite strand
+			      {
+				sameStrand[i]=true;
+			
+				if(flipped[j]==false)
+				  {
+				    revComplement(readSeqs[i]); //reverse complement and replace the orginal sequence
+				    std::reverse(qualityStrings[i].begin(), qualityStrings[i].end()); //reverse the quality scores
+			
+				    //  cerr<<"on opposite strand for unkonwn read rev complemented "<<i<<" it matches read "<<j<<endl;
+			
+	    
+				    flipped[i]=true;
+				  }
+				
+				foundFlag=true;
+				//cerr<<"on opposite strand for unkonwn read "<<i<<" it matches read "<<j<<endl;
+			      
+				break;
+			      
+			      }
+
+
+			  }
+
+		      }
+
+		  }
+
+		if(foundFlag==false)
+		  {
+		    ctrUnassigned;
+		  }
+
+	      }
+
+	
+	    
+	  }
+
+      }
+
+    /*
+    int z;
+   for(z=0; z!=sameStrand.size(); z++)
+     {
+
+       cerr<<sameStrand[z]<<endl;
+
+     }
+    */
+
+    /*          
+   int z;
+   for(z=0; z!=readSeqs.size(); z++)
+     {
+
+       cerr<<readSeqs[z]<<endl;
+
+     }
+    
+    */
+
+
+}
+
+
+
 
 //very simple compare function to pass to sort in order to sort pairs by the second element
 bool comparePairs(const std::pair<uint_fast64_t, long>&i, const std::pair<uint_fast64_t, long>&j)
@@ -1323,6 +1534,8 @@ void ReadCluster::setKmerSize(int size)
 
 void ReadCluster::setStartPositions(uint_fast64_t kmer)
 {
+  sameStrand.clear();
+  std::fill(startPositions.begin(), startPositions.end(), -1);
   
   auto iter=kmerPositions.begin(); //vectorIterator
   long ctr=0;
@@ -1336,25 +1549,48 @@ void ReadCluster::setStartPositions(uint_fast64_t kmer)
 	    if(startPositions[ctr]==-1) //if have not already assembled this read into the cluster
 	      {
 		startPositions[ctr]=(*iter)[kmer];
+		sameStrand.push_back(true);
+		//		cerr<<"inside set StartPositions function "<<endl;
 	      }
+	  }else
+	  {
+	    sameStrand.push_back(false);
 	  }
 
 	ctr++;
       }
 
+
+    
+    /*
+    cerr<<"starting to print same Staand stuff size is"<<sameStrand.size()<<endl;
+    auto iterStrand=sameStrand.begin();
+
+    for(iterStrand; iterStrand!=sameStrand.end(); iterStrand++)
+      {
+	cerr<<(*iterStrand)<<endl;
+
+
+      }
+    */
+
+    //cerr<<"sameSTrand size is "<<sameStrand.size()<<endl;
 }
 
 void ReadCluster::printStartPositions()
 {
 
+  
   auto iter=startPositions.begin();
 
     for(iter; iter!=startPositions.end(); iter++)
       {
-	cout<<(*iter)<<endl;
+	cerr<<(*iter)<<endl;
 
 
       }
+
+    
 
 }
 

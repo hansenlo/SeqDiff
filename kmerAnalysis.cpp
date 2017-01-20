@@ -1115,21 +1115,53 @@ void printUniqueReads(vector< string > &uniqueReadsBuffer, std::vector<int> &qua
 
   long j;
 
-  		      
+  	
+  double ctr=0;
+
+  /*
+#pragma omp critical(DEBUGGING_PRINT_UNIQUE_READS)
+      {
+
+  cerr<<"uniqueREadsBuffer size is "<<uniqueReadsBuffer.size()<<endl;
+  cerr<<"qualityBuffer size is "<<qualityBuffer.size()<<endl;
+
+      }
+  */
+
+
+	      
   for(j=0; j<(uniqueReadsBuffer.size()-3); j+=4)
     {
+      
 
 
 #pragma omp critical(PRINT_UNIQUE_READS)
       {
 
-	uniqueOut<<"@"<<j<<"_"<<uniqueReadsBuffer[j+2]<<"_"<<qualityBuffer[j]<<"_"<<uniqueReadsBuffer[j+3]<<"\n"; //fastq read header appending which cluster the read belongs into the header
+	/*
+	if(uniqueReadsBuffer[j]=="CCTTTCGGCTCTTTGACTACCTTTTGCTCTTTGACTACCTTAGATCTTTGACTACCTTTGCCCATTGACTAACTT")
+	  {
+	    cerr<<uniqueReadsBuffer[j+2]<<endl;
+	    cerr<<qualityBuffer[j]<<endl;
+	    cerr<<uniqueReadsBuffer[j+3]<<endl;
+
+	   
+
+	  }
+	*/
+	//if(uniqueReadsBuffer.size()==100)
+	//{
+	uniqueOut<<"@"<<j<<"_"<<uniqueReadsBuffer[j+2]<<"_"<<qualityBuffer[ctr]<<"_"<<uniqueReadsBuffer[j+3]<<"\n"; //fastq read header appending which cluster the read belongs into the header
 	uniqueOut<<uniqueReadsBuffer[j]<<"\n"; //sequence
 	uniqueOut<<"+"<<"\n"; //spacer line
 	uniqueOut<<uniqueReadsBuffer[j+1]<<"\n"; //quality scores
+	//}
+	ctr++;
       
       }
-    
+
+      //cerr<<"ctr is "<<ctr<<endl;
+
     }
 
 
@@ -1137,7 +1169,7 @@ void printUniqueReads(vector< string > &uniqueReadsBuffer, std::vector<int> &qua
 }
 
 
-void filterClusters(google::dense_hash_map<long, long, stdHash> &linkClusters, //hash table key is a cluster id the value is the cluster id that the key cluster should be merged with 
+void filterClusters(std::unordered_map<double, double > &linkClusters, //hash table key is a cluster id the value is the cluster id that the key cluster should be merged with 
 		    int maxConnectivity) //max number of clusters that can be connected any more connections and the cluster is flagged as a bad cluster
 {
 
@@ -1146,8 +1178,10 @@ void filterClusters(google::dense_hash_map<long, long, stdHash> &linkClusters, /
   long currentIndex, firstIndex, previousIndex, connectivityCtr;
 	      //cerr<<"currentIndex is "<<currentIndex<<endl;
 
-  dense_hash_map<long, long, stdHash>::iterator myHashIteratorTemp;
+  std::unordered_map<double, double >::iterator myHashIteratorTemp;
   
+  //google::dense_hash_map<long, long, stdHash> test;
+  //test.set_empty_key(4294967276);
 
   for(myHashIteratorTemp=linkClusters.begin(); myHashIteratorTemp!=linkClusters.end(); myHashIteratorTemp++)
     {
@@ -1181,13 +1215,15 @@ void filterClusters(google::dense_hash_map<long, long, stdHash> &linkClusters, /
 	      //cerr<<"inside connectivity condition "<<endl;
 
 	      currentIndex=linkClusters[firstIndex];
-
+	      
+	      //while((test.count(currentIndex)==0) && (endChain==false))
 	      while((currentIndex!=-1) && (endChain==false))
 		{
 		  previousIndex=currentIndex;
 	
 		  if(linkClusters.count(currentIndex)>0)
 		    {
+		      //test[previousIndex]=-1;
 		      linkClusters[previousIndex]=-1;
 		      currentIndex=linkClusters[currentIndex];
 		    }else
@@ -1197,6 +1233,8 @@ void filterClusters(google::dense_hash_map<long, long, stdHash> &linkClusters, /
 		}
 
 
+	      //test[firstIndex]=-1;
+	     
 	      linkClusters[firstIndex]=-1;
 
 	      endChain=true;
@@ -1230,7 +1268,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		    uint_fast64_t &clusterCtr, //count of how many clusters there currently are will be shared among threads
 		    int tid, //thread id number passing this for debugging purposes
 		    int numFiles, //number of files to print clusters to
-		    google::dense_hash_map<long, long, stdHash> &linkClusters  //hash table key is a cluster id the value is the cluster id that the key cluster should be merged with 
+		    std::unordered_map<double, double > &linkClusters  //hash table key is a cluster id the value is the cluster id that the key cluster should be merged with 
 
 )
 {
@@ -1250,7 +1288,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
   long newClusterIndex;
 
   int poorQualityCutoff;
-
+  int positionFirstClusterIndex;  //the position on the read of the first unique word that can be assigned to a cluster
 
   string validChar = "ACGTacgtN";
   string DNAchar="ACGTacgt";
@@ -1582,39 +1620,56 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			    {
 			      newClusterIndex=clusterKmers[key];
 		
+                            #pragma omp critical(LINK_CLUSTER_POS)
+			      {
+
 			      
 			      //unique words from two different clusters are on the read
-			      if(newClusterIndex!=firstClusterIndex)
-				{
+				if(newClusterIndex!=firstClusterIndex)
+				  {
 				  //cerr<<"inside postive stand if condition "<<endl;
 
-				  //only link clusters once if I don't do this then frequntely the master cluster will itself be listed as a cluster to be merged
-				  if(linkClusters.count(firstClusterIndex)>0)
-				    {
-
-				      if(linkClusters[firstClusterIndex]!=newClusterIndex)
-					{
-                                          #pragma omp critical(LINK_CLUSTER)
+				    //only link clusters if the words are less than k far apart do this to ensure the two novel words are being generated by the same variant!
+				    
+					if(abs(i-positionFirstClusterIndex)<kmerSize && ((i> (kmerSize)) && (i< (workNodePtr->chunk[j].size()-kmerSize)))  )
 					  {
-					    linkClusters[newClusterIndex]=firstClusterIndex;
+
+
+				      
+				  //only link clusters once if I don't do this then frequntely the master cluster will itself be listed as a cluster to be merged
+					    if(linkClusters.count(firstClusterIndex)>0)
+					      {
+
+						if(linkClusters[firstClusterIndex]!=newClusterIndex)
+						  {
+                                          //#pragma omp critical(LINK_CLUSTER)
+					  //{
+						    linkClusters[newClusterIndex]=firstClusterIndex;
+					    //}
+						  }
+					      }
 					  }
-					}
-				    }
-				}else
-				{
+				  }else
+				  {
 
-				  if(newClusterIndex!=firstClusterIndex)
-				    {
-                                  
-                                     #pragma omp critical(LINK_CLUSTER_POS)
+				    if(newClusterIndex!=firstClusterIndex)
 				      {
-					linkClusters[newClusterIndex]=firstClusterIndex;
+
+					if(abs(i-positionFirstClusterIndex)<kmerSize && ((i> (kmerSize)) && (i< (workNodePtr->chunk[j].size()-kmerSize)))  )
+					  {
+                                 
+				      //#pragma omp critical(LINK_CLUSTER_POS)
+				      //{
+					    //only link clusters once if I don't do this then frequntely the master cluster will itself be listed as a cluster to be merged
+				
+					    linkClusters[newClusterIndex]=firstClusterIndex;
+					    //}
+
+					  }
 				      }
+				  }
 
-				    }
-				}
-
-			      
+			      }
 
 			    }
 
@@ -1625,8 +1680,9 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			  if(inCluster==false)
 			      {
 				
-				firstClusterIndex=clusterKmers[key];
-			      
+				firstClusterIndex=clusterKmers[key];      
+				positionFirstClusterIndex=i;
+
 			      //variable to store if read has been assigned to a cluster
 				inCluster=true;
 		
@@ -1642,7 +1698,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 			      
 			      //only outputting those unique reads that are placed in a cluster
-			      //			      uniqueReadsBuffer.push_back(workNodePtr->chunk[j]); //store the read sequence
+			      //uniqueReadsBuffer.push_back(workNodePtr->chunk[j]); //store the read sequence
 			      //uniqueReadsBuffer.push_back(workNodePtr->qualityScores[j]); //store the quality scores
 			      //uniqueReadsBuffer.push_back(to_string(firstClusterIndex)); //store the cluster it belongs to			 
 			      //uniqueReadsBuffer.push_back(to_string(maxCount)); //store the highest novel word count
@@ -1683,48 +1739,63 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			    {
 			      newClusterIndex=clusterKmers[reversedKey];
 		
+			      #pragma omp critical(LINK_CLUSTER_REV)
+			      {
 
-			      if(linkClusters.count(firstClusterIndex)>0)
-				{
+				if(linkClusters.count(firstClusterIndex)>0)
+				  {
 
 				  //only link clusters once if I don't do this then frequntely the master cluster will itself be listed as a cluster to be merged
 
-				  if(linkClusters[firstClusterIndex]!=newClusterIndex)
-				    {
+				    if(linkClusters[firstClusterIndex]!=newClusterIndex)
+				      {
                                   
 
 
 			      //unique words from two different clusters are on the read
-				      if(newClusterIndex!=firstClusterIndex)
-					{
+					if(newClusterIndex!=firstClusterIndex)
+					  {
+
+
+					   
+
+					    if(abs(i-positionFirstClusterIndex)<kmerSize && ((i> (0+kmerSize)) && (i<workNodePtr->chunk[j].size()-kmerSize))  )
+					      {
 
 				  //cerr<<"inside negative stand if condition "<<endl;
-				        #pragma omp critical(LINK_CLUSTER_REV)
-					  {
-					    linkClusters[newClusterIndex]=firstClusterIndex;
+					  //#pragma omp critical(LINK_CLUSTER_REV)
+					  //{
+						linkClusters[newClusterIndex]=firstClusterIndex;
+					  //}
+
+					      }
 					  }
 
-					}
-
-				    }
-
-				}else
-				{
-
-				  if(newClusterIndex!=firstClusterIndex)
-				    {
-                                  
-                                      #pragma omp critical(LINK_CLUSTER_REV_2)
-				      {
-					linkClusters[newClusterIndex]=firstClusterIndex;
 				      }
 
-				    }
+				  }else
+				  {
+
+				    if(newClusterIndex!=firstClusterIndex)
+				      {
+                                  
+                                      //#pragma omp critical(LINK_CLUSTER_REV_2)
+				      //{
 
 
-				}
+					if(abs(i-positionFirstClusterIndex)<kmerSize && ((i> (0+kmerSize)) && (i<workNodePtr->chunk[j].size()-kmerSize))  )
+					  {
 
-			      
+					    linkClusters[newClusterIndex]=firstClusterIndex;
+					  }
+					    //}
+
+				      }
+
+
+				  }
+
+			      }
 
 			    }
 
@@ -1737,6 +1808,9 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 				firstClusterIndex=clusterKmers[reversedKey];
 			      //variable to store if read has been assigned to a cluster
+				positionFirstClusterIndex=i;
+
+
 				inCluster=true;
 
 			      if(goodQuality)
@@ -1755,7 +1829,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			      //uniqueReadsBuffer.push_back(workNodePtr->chunk[j]); //store the read sequence
 			      //uniqueReadsBuffer.push_back(workNodePtr->qualityScores[j]); //store the quality scores
 			      //uniqueReadsBuffer.push_back(to_string(firstClusterIndex)); //store the cluster it belongs to
-			      //uniqueReadsBuffer.push_back(to_string(maxCount)); //store the cluster it belongs to
+			      ///uniqueReadsBuffer.push_back(to_string(maxCount)); //store the cluster it belongs to
 			      
 			    }
  
@@ -1842,7 +1916,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			uniqueReadsBuffer.push_back(workNodePtr->chunk[j]); //store the read sequence
 			uniqueReadsBuffer.push_back(workNodePtr->qualityScores[j]); //store the quality scores
 			uniqueReadsBuffer.push_back(to_string(clusterCtr)); //store the cluster it belongs to
-			uniqueReadsBuffer.push_back(to_string(maxCount)); //store the cluster it belongs to
+			uniqueReadsBuffer.push_back(to_string(maxCount)); //store the max unique word count
 		
 
 		      }
@@ -1859,13 +1933,13 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 		  uniqueReadsBuffer.push_back(workNodePtr->chunk[j]); //store the read sequence
 		  uniqueReadsBuffer.push_back(workNodePtr->qualityScores[j]); //store the quality scores
-		  uniqueReadsBuffer.push_back(to_string(clusterCtr)); //store the cluster it belongs to
-		  uniqueReadsBuffer.push_back(to_string(maxCount)); //store the cluster it belongs to
+		  uniqueReadsBuffer.push_back(to_string(firstClusterIndex)); //store the cluster it belongs to
+		  uniqueReadsBuffer.push_back(to_string(maxCount)); //store the max unique word count
 		
       
 		  //break;
 		}
-	
+		  
 		  
 		  
 
@@ -1895,6 +1969,9 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
       //}
      		
       printUniqueReads(uniqueReadsBuffer, qualityBuffer,  uniqueOut, tid);
+
+      uniqueReadsBuffer.clear();
+      qualityBuffer.clear();
 
   //flush whatever is left in the buffers
       //printClusters(clusterBuffer, clusterFiles, uniqueReadsBuffer, qualityBuffer, qualityStringBuffer, uniqueOut, files, tid);
@@ -2043,8 +2120,11 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
   dense_hash_map<uint_fast64_t, int, customHash> readPositions;
   readPositions.set_empty_key(-20);
 
-  google::dense_hash_map<long, long, stdHash> linkClusters;
-  linkClusters.set_empty_key(4294967276);
+
+  std::unordered_map<double, double > linkClusters;
+
+    //  google::dense_hash_map<long, long, stdHash> linkClusters;
+    //linkClusters.set_empty_key(4294967276);
 
 
 
@@ -2381,24 +2461,33 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
   uniqueOut.close();
 
 
+  int maxConnectivity=2;
+  //filtering out bad clusters
+  filterClusters(linkClusters, maxConnectivity);
+
+  //cerr<<"just finished with filter clusters function "<<endl;
+
+
   //sending clusters to their respective files
-  //sendClustersToFile(uniqueReadFile, clusterFiles, files, linkClusters, numFiles);
+  sendClustersToFile(uniqueReadFile, clusterFiles, files, linkClusters, numFiles);
 
 
   //dense_hash_map<uint_fast64_t, long, customHash> clusterKmers; //hash table key is kmer value is the cluster that kmer belongs to
 
 
+  
   /*    
   ofstream debuggingLinking("debuggingLinking.dat");
 
 
-
-  dense_hash_map<long, long, stdHash>::iterator myHashIteratorTemp;
+  
+  //  std::unordered_map<long, long>::iterator myHashIteratorTemp;
+  
   
    //unordered_map<uint_fast64_t, char>::iterator myHashIterator;
   cerr<<"started printing link clusters hash table "<<endl;
 
-   for(myHashIteratorTemp=linkClusters.begin(); myHashIteratorTemp!=linkClusters.end(); myHashIteratorTemp++)
+   for(auto myHashIteratorTemp=linkClusters.begin(); myHashIteratorTemp!=linkClusters.end(); myHashIteratorTemp++)
      {
        debuggingLinking<<myHashIteratorTemp->first<<"\t"<<myHashIteratorTemp->second<<endl;
        
@@ -2409,12 +2498,7 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
   */
    
 
-  int maxConnectivity=2;
-  //filtering out bad clusters
-  //filterClusters(linkClusters, maxConnectivity);
-
-  cerr<<"just finished with filter clusters function "<<endl;
-
+  
 
 
   return(fileNames);
@@ -2422,7 +2506,7 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
 }
 
 
-void sendClustersToFile(string &uniqueReadFile, google::dense_hash_map<uint_fast32_t, int, stdHash> &clusterFiles, std::vector<std::shared_ptr<std::ofstream> > &files, google::dense_hash_map<long, long, stdHash> &linkClusters, int numFiles)
+void sendClustersToFile(string &uniqueReadFile, google::dense_hash_map<uint_fast32_t, int, stdHash> &clusterFiles, std::vector<std::shared_ptr<std::ofstream> > &files, std::unordered_map<double, double > &linkClusters, int numFiles)
 {
   ifstream uniqueReads;
 
@@ -2508,7 +2592,7 @@ void sendClustersToFile(string &uniqueReadFile, google::dense_hash_map<uint_fast
 	   	     
 	      clusterIndex=stoull(tokenizedString[1]);
 
-	      //follow the chain of clusters until you have reached the master cluster
+	      //follow the chain of clusters until you have reached the master cluster or until you get a cluster that has been filtered out i.e. set to -1 in the link Clusters hash table
 	      bool endChain=false;
 	      long currentIndex=clusterIndex;
 	   
@@ -2519,27 +2603,30 @@ void sendClustersToFile(string &uniqueReadFile, google::dense_hash_map<uint_fast
 		  if(linkClusters.count(currentIndex)>0)
 		    {
 		      currentIndex=linkClusters[currentIndex];
+		 
 		    }else
 		    {
 		      endChain=true;
 		    }
 
-		  cerr<<"currentIndex is "<<currentIndex<<endl;
+		 
+
+		  //cerr<<"currentIndex is "<<currentIndex<<endl;
 		}
 
-	  
-	      tokenizedString.clear();
-
-	      
-
-
+	 
 	      //cerr<<"last index is "<<currentIndex<<endl;
 
+	      if(currentIndex!=-1)
+		{
 
 	      //storing the read info in output buffers
-	      clusterBuffer.push_back(vector<string>{readSeq, to_string(currentIndex), tokenizedString[3]} );
-	      qualityBuffer.push_back(stoull(tokenizedString[2]));
-	      qualityStringBuffer.push_back(qualityString);
+		  clusterBuffer.push_back(vector<string>{readSeq, to_string(currentIndex), tokenizedString[3]} );
+		  qualityBuffer.push_back(stoull(tokenizedString[2]));
+		  qualityStringBuffer.push_back(qualityString);
+		}
+
+	      tokenizedString.clear();
 
 
 	      //if clusterBuffer reaches the maximum size then output each read sequence to the correct 
@@ -2547,7 +2634,7 @@ void sendClustersToFile(string &uniqueReadFile, google::dense_hash_map<uint_fast
 	 
 	      if(clusterBuffer.size()>10000)
 		{
-		  //		  printClusters(clusterBuffer, clusterFiles, qualityBuffer, qualityStringBuffer, files);		
+		   printClusters(clusterBuffer, clusterFiles, qualityBuffer, qualityStringBuffer, files);		
 		
 		   clusterBuffer.clear();
 		   qualityBuffer.clear();
@@ -2567,7 +2654,7 @@ void sendClustersToFile(string &uniqueReadFile, google::dense_hash_map<uint_fast
 
 
       //printing the last of the clusters
-      //printClusters(clusterBuffer, clusterFiles, qualityBuffer, qualityStringBuffer, files);
+      printClusters(clusterBuffer, clusterFiles, qualityBuffer, qualityStringBuffer, files);
 
 
 }
@@ -2660,7 +2747,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
       //can parse string this way because words seperated by spaces
 	  iss>>read>>clusterIdentifier>>stringMaxCount>>qualityFlag>>qualityString;
 	  
-
+	 
 
 	 
       //convert from string into and integer
@@ -2777,6 +2864,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	    
 
 	      
+	      
 	      //adding the sequences to the cluster
 	      cluster.addSequences(iter->second);
 	      cluster.setKmerSize(clusterKmerSize);
@@ -2784,6 +2872,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	      
 
 
+	      
 	      // uint_fast64_t maxKmer=1;
 
 	    	  
@@ -2791,7 +2880,26 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
 
 	      cluster.setStartPositions(maxKmer); 
+
+
+	      //if(iter->first==59704)
+	      //{
+	       
+	      //  cerr<<"starting second get kemrs "<<endl;
+
+	      //ensuring all reads in the cluster are on the same strand
+		  cluster.revCompCluster(maxKmer);
 		 
+		
+	      
+	      //need to call again now hopefully with all reads on the same strand
+	      maxKmer=cluster.getKmers();
+	      cluster.setStartPositions(maxKmer); 
+
+	      //cluster.printStartPositions();
+
+	      //}//end debugiggn
+
 
 		  //cluster.printStartPositions();
 
