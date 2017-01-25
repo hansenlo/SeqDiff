@@ -133,11 +133,11 @@ int main(int argc, char *argv[] )
 					  
   readInFasta(genome, "/data/Genomes/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
 
-  cerr<<"starting to call indels"<<endl;
+  //  cerr<<"starting to call indels"<<endl;
 
-  callIndels("foo.dat", 0, genome);
+  //callIndels("foo.dat", 0, genome);
   
-  return(0);
+  //return(0);
 
 
 	  //100 is the number of reference sequences to append to the vcf record 
@@ -148,7 +148,7 @@ int main(int argc, char *argv[] )
 
   //   parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/SimulatedDataOutput200bpReads/SV_Deletions_seq.vcf"); 
 
-  parseVcf(vcfResults, "/data2/simulatedDataVariableReadSize/100bpRandomVariantsOut/VariantCalls/temp.vcf"); 
+  parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/platinumGenomeChr21/temp.vcf"); 
 
 
   //parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/SimulatedDataOutput/SV_calls.vcf"); 
@@ -159,7 +159,7 @@ int main(int argc, char *argv[] )
 
   cerr<<"duplicates removed "<<endl;
 
-  printVcf(vcfResults, "/data2/simulatedDataVariableReadSize/100bpRandomVariantsOut/VariantCalls/deDuplicatedSV_allContigs_Deletions.vcf");
+  printVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/platinumGenomeChr21/foo.vcf");
 
   cerr<<"reading in duplicated file adding genomic sequence "<<endl;
 
