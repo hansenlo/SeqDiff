@@ -131,13 +131,13 @@ int main(int argc, char *argv[] )
   unordered_map<string, string> genome;
 
 					  
-  readInFasta(genome, "/data/Genomes/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
+  //readInFasta(genome, "/data/Genomes/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
 
-  //  cerr<<"starting to call indels"<<endl;
+  cerr<<"starting to call indels"<<endl;
 
-  //callIndels("foo.dat", 0, genome);
+  //  callIndels("/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_mergedContigs_contigs.sam", 15, genome);
   
-  //return(0);
+  // return(0);
 
 
 	  //100 is the number of reference sequences to append to the vcf record 
@@ -495,23 +495,28 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
   //snp file header
 
-   "##fileformat=VCFv4.2\n";
-    snpOut<<"##reference=hg19\n";
-    snpOut<<"##INFO=<ID=Contig,Number=1,Type=String,Description=\"Contig id the variant was derived from\">\n";
-    snpOut<<"##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
-    snpOut<<"##INFO=<ID=AlleleFraction,Number=1,Type=Float,Description=\"The number of reads in contig cluster variant was derived from divided by the coverage in a 200 bp window centered on variant\">\n";
-    snpOut<<"##FORMAT=<ID=GT,Number=1,Type=Integer,Description=\"Genotype\">\n";
-    snpOut<<"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\n";
 
 
-    indelOut<< "##fileformat=VCFv4.2\n";
-    indelOut<< "##reference=hg19\n";
-    indelOut<< "##INFO=<ID=Contig,Number=1,Type=String,Description=\"Contig id the variant was derived from\">\n";
-    indelOut<< "##INFO=<ID=Length,Number=1,Type=Integer,Description=\"The length of the indel\">\n";
-    indelOut<< "##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
-    indelOut<< "##INFO=<ID=AlleleFraction,Number=1,Type=Float,Description=\"The number of reads in contig cluster variant was derived from divided by the coverage in a 200 bp window centered on variant\">\n";
-    indelOut<< "##FORMAT=<ID=GT,Number=1,Type=Integer,Description=\"Genotype\">\n";
-    indelOut<< "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNA12878\n";
+
+
+
+  snpOut<<"##fileformat=VCFv4.2\n";
+  snpOut<<"##reference=hg19\n";
+  snpOut<<"##INFO=<ID=Contig,Number=1,Type=String,Description=\"Contig id the variant was derived from\">\n";
+  snpOut<<"##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
+  snpOut<<"##INFO=<ID=AlleleFraction,Number=1,Type=Float,Description=\"The number of reads in contig cluster variant was derived from divided by the coverage in a 200 bp window centered on variant\">\n";
+  snpOut<<"##FORMAT=<ID=GT,Number=1,Type=Integer,Description=\"Genotype\">\n";
+  snpOut<<"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNA12878\n";
+
+
+  indelOut<< "##fileformat=VCFv4.2\n";
+  indelOut<< "##reference=hg19\n";
+  indelOut<< "##INFO=<ID=Contig,Number=1,Type=String,Description=\"Contig id the variant was derived from\">\n";
+  indelOut<< "##INFO=<ID=Length,Number=1,Type=Integer,Description=\"The length of the indel\">\n";
+  indelOut<< "##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
+  indelOut<< "##INFO=<ID=AlleleFraction,Number=1,Type=Float,Description=\"The number of reads in contig cluster variant was derived from divided by the coverage in a 200 bp window centered on variant\">\n";
+  indelOut<< "##FORMAT=<ID=GT,Number=1,Type=Integer,Description=\"Genotype\">\n";
+  indelOut<< "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNA12878\n";
  
 
 
@@ -645,12 +650,48 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
       string alt="";
       bool deletion=false;
       bool insertion=false;
+      bool startedSearch=false; // variable to store whether or not have started looking for a variant need this becase I ignore variants called at the end or beginning of alignments
       string lastNucRef="";
       refPos=stoull(alignments[i][3], NULL, 10)-1;
+
+      //only call Snps and Indels for variants that fall in the middle of the contig because true variants should almost always be in the middle
+      //and alignment artifacts will be on the ends. Only call variants that are at least ten percent of the contig length inside the contig
      
+      double sizeInto=readAlign.size()*0.2;
+
+      double temp=refPos;
+
+      //sizeInto=0;
+
+
+
       //running through the alignment calling the snps and indels
-      for(int k=0; k<readAlign.size(); k++)
+      for(int k=0; k<(readAlign.size()-sizeInto); k++)
 	{
+
+
+
+
+	  if(refAlign[k]!='-')
+	    {
+	      refPos++;
+	    }
+
+
+	  if((readAlign[k]!='-' && refAlign[k]!='-') && k >=sizeInto)
+	    {
+	      startedSearch=true;
+	    }
+
+	  
+	  // if((readAlign[k]=='-' || refAlign[k]=='-') || startedSearch==false)
+	    
+	  if(startedSearch==false)
+	    {
+	      continue;
+	    }
+	  
+
 	  //if have an insertion immediately followed by a deletion or vice versa then  need to keep track of last reference base
 	  if(refAlign[k]!='-')
 	    {
@@ -660,7 +701,7 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
 	  if(readAlign[k]!=refAlign[k])
 	    {
-	      if(readAlign[k]=='-' & refAlign[k]=='-')
+	      if(readAlign[k]=='-' && refAlign[k]=='-')
 		{
 		  cerr<<"error in reconstructing aligment should not have - in both ref and read at the same location "<<endl;
 		  return;
@@ -669,13 +710,29 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 	      //deletion
 	      if(readAlign[k]=='-')
 		{
+		  
 		  if(deletion==false)
 		    {
-		      //ref=string(1, toupper(refAlign[k-1]))+string(1, toupper(refAlign[k]));
-		      ref=lastNucRef+string(1, toupper(refAlign[k]));
+		      ref=string(1, toupper(refAlign[k-1]))+string(1, toupper(refAlign[k]));
+		      //ref+string(1, toupper(refAlign[k]));
 		      deletion=true;
-		      alt=ref;
+		      alt=string(1, toupper(refAlign[k-1]));
+
 		      
+		      if(alignments[i][0]=="141210_68")
+			{
+			  cerr<<"inside initial deletion statement k is "<<k<<endl;
+			  cerr<<"ref is "<<ref<<endl;
+			  cerr<<"alt is "<<alt<<endl;
+
+			  cerr<<"readAlign is "<<readAlign<<endl;
+			  cerr<<"refAlign is  "<<refAlign<<endl;
+			  cerr<<"\n\n\n\n"<<endl;
+			}
+		      
+
+		  
+    
 		  
 		    }else
 		    {
@@ -705,9 +762,28 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
 		}
 
+
+	     
+
 	      //insertion
 	      if(refAlign[k]=='-')
 		{
+
+		  /*
+		  if(alignments[i][0]=="148744_91")
+			{
+			  cerr<<"inside insertion statement k is "<<k<<endl;
+			  cerr<<"ref is "<<ref<<endl;
+			  cerr<<"alt is "<<alt<<endl;
+
+			  cerr<<"readAlign is "<<readAlign<<endl;
+			  cerr<<"refAlign is  "<<refAlign<<endl;
+			  cerr<<"\n\n\n\n"<<endl;
+			}
+		  */
+
+		   
+
 		  if(insertion==false)
 		    {
 		      //ref=string(1, toupper(refAlign[k-1]));
@@ -720,9 +796,11 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 		      alt=alt+readAlign[k];
 		    }
 
-		  //special case of a deletion right after and insertion
+		  //special case of a deletion right before and insertion
 		  if(deletion==true)
 		    {
+
+
 		      //subtract 1 from reference size because ref sequence includes the base before the deletion
 		      posDel=refPos-(ref.size()-1);
 
@@ -738,71 +816,106 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
 
 
-		}else
-		{
+		}//else
+	      //{
 		  //if a snp match or deletion in the read then increment the ref position do not increment if there is an insertion in the read 
-		  refPos++;
-		}
+	      //  refPos++;
+	      //}
 
-	      if(readAlign[k]!='-' & refAlign[k]!='-')
-		{
+	    }
+
+
+	  if(readAlign[k]!='-' && refAlign[k]!='-')
+	    {
+
 		  //is a snp
-		  if(toupper(readAlign[k])!=toupper(refAlign[k]) && readAlign[k]!='N')
-		    {
-		      info=alignments[i][0]+";Type=SNP;AlleleFraction=.";
-		      string printSnp=alignments[i][2]+"\t"+std::to_string(refPos)+"\t"+"."+"\t"+string(1, toupper(refAlign[k]))+"\t"+string(1, toupper(readAlign[k]))+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
-		      snpOut<<printSnp<<endl;
-		    }
+	      if(toupper(readAlign[k])!=toupper(refAlign[k]) && readAlign[k]!='N')
+		{
+		      
+
+		  info=alignments[i][0]+";Type=SNP;AlleleFraction=.";
+		  string printSnp=alignments[i][2]+"\t"+std::to_string(refPos)+"\t"+"."+"\t"+string(1, toupper(refAlign[k]))+"\t"+string(1, toupper(readAlign[k]))+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
+		  snpOut<<printSnp<<endl;
+		}
 		
 		  
 		  //printing out the insertion
-		  if(insertion==true)
+	      if(insertion==true)
+		{
+		      //cerr<<"inside insertion if statement "<<endl;
+
+		  /*
+		  if(alignments[i][0]=="148744_91")
 		    {
-			posIns=refPos-(alt.size()-1);
+		      cerr<<"inside insertion print statement "<<endl;
+		      cerr<<"ref is "<<ref<<endl;
+		      cerr<<"alt is "<<alt<<endl;
 
-			info=alignments[i][0]+";Length="+std::to_string(alt.size()-1)+";Type=INS;AlleleFraction=.";
-			printIndel=alignments[i][2]+"\t"+std::to_string(posIns)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
-
-			indelOut<<printIndel<<endl;
-
-			insertion=false;
-			ref="";
-			alt="";
+		      cerr<<"readAlign is "<<readAlign<<endl;
+		      cerr<<"refAlign is  "<<refAlign<<endl;
+		      cerr<<"\n\n\n\n"<<endl;
 		    }
+
+		  */
+
+		  posIns=refPos-(alt.size()-1);
+
+		  info=alignments[i][0]+";Length="+std::to_string(alt.size()-1)+";Type=INS;AlleleFraction=.";
+		  printIndel=alignments[i][2]+"\t"+std::to_string(posIns)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
+
+		  indelOut<<printIndel<<endl;
+
+		  insertion=false;
+		  ref="";
+		  alt="";
+		}
 
 
 		  //printing out the deletion
-		  if(deletion==true)
-		    {
+	      if(deletion==true)
+		{
+
+		  /*
+		  if(alignments[i][0]=="141210_68")
+			{
+			  cerr<<"refPos is "<<refPos<<endl;
+			  
+			}
+		  */
+
+
 		      //subtract 1 from reference size because ref sequence includes the base before the deletion
-		      posDel=refPos-(ref.size()-1);
+		  //posDel=refPos-(ref.size()-1);
 
-		      info=alignments[i][0]+";Length="+std::to_string(ref.size()-1)+";Type=DEL;AlleleFraction=.";
-		      printIndel=alignments[i][2]+"\t"+std::to_string(posDel)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
-
-		      indelOut<<printIndel<<endl;
-
-		      deletion=false;
-		      ref="";
-		      alt="";
-		    }
+		  posDel=refPos-(ref.size());
 
 
+		  info=alignments[i][0]+";Length="+std::to_string(ref.size()-1)+";Type=DEL;AlleleFraction=.";
+		  printIndel=alignments[i][2]+"\t"+std::to_string(posDel)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
+		  
+		  indelOut<<printIndel<<endl;
 
-
+		  deletion=false;
+		  ref="";
+		  alt="";
 		}
+
 
 
 
 	    }
+
+
+
+	 
 	  
 	  
 
      	}
       
-      cerr<<"readAlign is "<<readAlign<<endl;
-      cerr<<"refAlign is "<<refAlign<<endl;
-      cerr<<"\n\n\n\n"<<endl;
+      //cerr<<"readAlign is "<<readAlign<<endl;
+      //cerr<<"refAlign is "<<refAlign<<endl;
+      //cerr<<"\n\n\n\n"<<endl;
       
 
     }
@@ -835,9 +948,9 @@ void parseSam(vector<vector<string>> &sam, string samFile, int mapCutoff)
 	{
 	  getline(samRecords, line);
 
-	  if(ctr % 1000000==0)
+	  if(ctr % 100000==0)
 	    {
-	      cerr<<"number of sam records is "<<sam.size()<<endl;
+	      cerr<<"number of sam records processed is "<<sam.size()<<endl;
 	    }
 
 	  ctr++;

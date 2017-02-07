@@ -1598,6 +1598,9 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 	      if(kmerCounter>=1)
 		{ 
 		  //continue;
+
+             #pragma omp critical(END_LINK_CLUSTER_COLLISIONS)
+		  {
 		  
 		  if(isUnique) //if the current kmer is unique
 		    {
@@ -1891,8 +1894,10 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			  }
 			}
  
-		    }
+		    } //end brace for isUnique
 		
+		}
+
 
 		  //if have obtained the set of all possible unique kmers or reached the end of the read
 		  //then generate a new cluster if no assignment can be made
@@ -2495,7 +2500,7 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
 
 
   
-     
+  /*     
   ofstream debuggingLinkingBefore("debuggingLinkingBeforeFiltering.dat");
 
 
@@ -2515,7 +2520,7 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
    debuggingLinkingBefore.close();
   
   
-
+  */
 
 
   int maxConnectivity=4;
@@ -2541,6 +2546,7 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
   //  std::unordered_map<long, long>::iterator myHashIteratorTemp;
   
   
+  /*
    //unordered_map<uint_fast64_t, char>::iterator myHashIterator;
   cerr<<"started printing link clusters hash table "<<endl;
 
@@ -2552,7 +2558,7 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
   
    debuggingLinking.close();
   
-  
+  */
    
 
   

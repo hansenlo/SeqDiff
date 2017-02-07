@@ -1131,12 +1131,12 @@ sub getVar_MDstring($)
     $refSeq="";
     $altSeq="";
 
-    #$cmd="/data/bin/SamTSV/jvarkit/dist-1.128/sam2tsv -r /data/Genomes/human19/allChrhg19InOrder.fa  $samFile > temp.dat";
+    $cmd="/data/bin/SamTSV/jvarkit/dist-1.128/sam2tsv -r /data/Genomes/human19/allChrhg19InOrder.fa  $samFile > temp.dat";
 
     #$cmd="/data/bin/SamTSV/jvarkit/dist-1.128/sam2tsv -r /data6/sukrit/081216_MiSeq_MMB1newdel_genomeSeq/MappingToReference/MMB1genomeCIRC84.fasta  $samFile > temp.dat";
 
 
-    $cmd="/data/bin/SamTSV/jvarkit/dist-1.128/sam2tsv -r /data/Genomes/cElegans10/allChr.fa  $samFile > temp.dat";
+    #$cmd="/data/bin/SamTSV/jvarkit/dist-1.128/sam2tsv -r /data/Genomes/cElegans10/allChr.fa  $samFile > temp.dat";
 
 
 

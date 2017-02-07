@@ -64,8 +64,8 @@ $path=$1."/";
 
 #$blastDB="/data/Bowtie2Index/hg19GATK";
 
-#$blastDB="/data/BwaIndex/allChrhg19InOrder.fa";
-$blastDB="/data/BwaIndex/allChr_cElegans10.fa";
+$blastDB="/data/BwaIndex/allChrhg19InOrder.fa";
+#$blastDB="/data/BwaIndex/allChr_cElegans10.fa";
 #$blastDB="/data6/sukrit/081216_MiSeq_MMB1newdel_genomeSeq/MappingToReference/MMB1genomeCIRC84.fasta";
 
 
@@ -105,7 +105,7 @@ if(1==1)
 
 #$cmd="time ./findDiff_BitString_HashTableVer $controlFile $file  31 0 $cutoff temp.dat > "."/home/hansenlo/SeqDiff/Results/".$outputUnique;
 
-$cmd="time ./variantFinder $expKmerCounts $expFastq 31 > temp.dat";
+$cmd="time ./variantFinder $expKmerCounts $expFastq 45 > temp.dat";
 
 #$cmd="time ./temp $controlFile $file  31 0 $cutoff temp.dat > "."/data7/SeqDiffResults/Results/".$outputUnique;;
 
@@ -542,7 +542,7 @@ system($cmd)==0
 
 print "starting to filter the alignments \n";
 
-&filterAlignments($alignmentOutput, 0.2, $contigs);
+#&filterAlignments($alignmentOutput, 0.2, $contigs);
 
 
 print "Starting iterative alignment\n";
@@ -555,7 +555,7 @@ print "Starting iterative alignment\n";
 #&iterativeAlignment("/data5/SeqDiffResults/Results/unique_allPlatinum_contigs.fasta", 20, 80,  $blastDB, $header);
 
 my $mappingQualityCutoff=35;
-&iterativeAlignment("clippedContigs.fa", 20, 60,  $blastDB, $header, $mappingQualityCutoff);
+#&iterativeAlignment("clippedContigs.fa", 20, 60,  $blastDB, $header, $mappingQualityCutoff);
 
 #&iterativeAlignment($contigs, 20, 180,  $blastDB, $header, $mappingQualityCutoff);
 
@@ -573,7 +573,7 @@ print "Starting to extend alignments\n";
 
 #&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", $contigs);
 
-&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/cElegans10/allChr.fa", $contigs);
+#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/cElegans10/allChr.fa", $contigs);
 
 #&extendAlignments("mappedReads_IDs.dat", 2, "/data6/sukrit/081216_MiSeq_MMB1newdel_genomeSeq/MappingToReference/MMB1genomeCIRC84.fasta", $contigs);
 
