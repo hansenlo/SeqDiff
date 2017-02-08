@@ -1620,8 +1620,8 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			    {
 			      newClusterIndex=clusterKmers[key];
 		
-                            #pragma omp critical(LINK_CLUSTER_POS)
-			      {
+			      //#pragma omp critical(LINK_CLUSTER_POS)
+			      //{
 
 			      
 			      //unique words from two different clusters are on the read
@@ -1684,7 +1684,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 				      }
 				  }
 
-			      }
+				//} //Link_cluster_Pos
  
 
 			    }
@@ -1729,12 +1729,12 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			      
 			      if(clusterKmers.count(key)==0 && distanceFirstKey < ((2*kmerSize)-1))
 			     	{
-				 #pragma omp critical(ADD_KEY_EXISTING_CLUSTER)
-				  {
+				  //#pragma omp critical(ADD_KEY_EXISTING_CLUSTER)
+				  //{
 				 
 				    clusterKmers[key]=firstClusterIndex;
 
-				  }
+				    //}
 				}
 
 
@@ -1754,8 +1754,8 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			    {
 			      newClusterIndex=clusterKmers[reversedKey];
 		
-			      #pragma omp critical(LINK_CLUSTER_REV)
-			      {
+			      // #pragma omp critical(LINK_CLUSTER_REV)
+			      //{
 
 				if(linkClusters.count(firstClusterIndex)>0)
 				  {
@@ -1826,7 +1826,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 				  }
 
-			      }
+				//} //LINK_Cluster_Rev
 
 			    }
 
@@ -1869,12 +1869,12 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 			   
 			      if(clusterKmers.count(reversedKey)==0 && distanceFirstKey < ((2*kmerSize)-1))
 			     	{
-				 #pragma omp critical(ADD_REV_KEY_EXISTING_CLUSTER)
-				  {
+				  //#pragma omp critical(ADD_REV_KEY_EXISTING_CLUSTER)
+				  //{
 				 
 				    clusterKmers[reversedKey]=firstClusterIndex;
 
-				  }
+				    //}
 				}
 			    }
 
@@ -1886,12 +1886,12 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		      if(inCluster==true && storedKmer==false && (abs(i-positionFirstClusterIndex)<kmerSize))
 			{
                       
-                        #pragma omp critical(ADD_NEW_KMER)
-			  {
+			  //#pragma omp critical(ADD_NEW_KMER)
+			  //{
 
 			    clusterKmers[key]=firstClusterIndex;
 			    
-			  }
+			    //}
 			}
  
 		    } //end brace for isUnique

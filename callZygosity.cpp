@@ -29,7 +29,8 @@ using std::stringstream;
 using std::ofstream;
 
 //given a contig alignment file parse the md and cigar string and call indels and snps mapCutoff is the minimum mapping quality necassary
-void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, string> &genome);
+//percentCutoff is the minimum percentage into the contig the variant needs to be in order to be called
+void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, string> &genome, double percentCutoff);
 
 //given a sam file parse it and return it as a matrix every row of the matrix will be an alignment file
 //mapCutoff is the mapping quality cutoff
@@ -131,13 +132,13 @@ int main(int argc, char *argv[] )
   unordered_map<string, string> genome;
 
 					  
-  //readInFasta(genome, "/data/Genomes/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
+  //  readInFasta(genome, "/data/Genomes/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
 
   cerr<<"starting to call indels"<<endl;
 
-  //  callIndels("/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_mergedContigs_contigs.sam", 15, genome);
+  //callIndels("/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs.sam", 15, genome, 0.1);
   
-  // return(0);
+  //return(0);
 
 
 	  //100 is the number of reference sequences to append to the vcf record 
@@ -482,7 +483,8 @@ return(0);
 
 
 //algorithm is to build the alignment from the cigar string then calling the snps and indels by stepping through the alignment 
-void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, string> &genome)
+//percentCutoff is the minimum percentage into the contig the variant needs to be in order to be called
+void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, string> &genome, double percentCutoff)
 {
   vector<vector<string>> alignments;
   string cigar, chr, readSeq;
@@ -657,7 +659,7 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
       //only call Snps and Indels for variants that fall in the middle of the contig because true variants should almost always be in the middle
       //and alignment artifacts will be on the ends. Only call variants that are at least ten percent of the contig length inside the contig
      
-      double sizeInto=readAlign.size()*0.2;
+      double sizeInto=readAlign.size()*percentCutoff;
 
       double temp=refPos;
 
@@ -718,7 +720,7 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 		      deletion=true;
 		      alt=string(1, toupper(refAlign[k-1]));
 
-		      
+		      /*		      
 		      if(alignments[i][0]=="141210_68")
 			{
 			  cerr<<"inside initial deletion statement k is "<<k<<endl;
@@ -729,7 +731,7 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 			  cerr<<"refAlign is  "<<refAlign<<endl;
 			  cerr<<"\n\n\n\n"<<endl;
 			}
-		      
+		      */
 
 		  
     
@@ -747,7 +749,7 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 		    {
 		      //subtract 1 from alt size because alt sequence includes the base before the insertion
 
-		      posIns=refPos-(alt.size()-1);
+		      posIns=refPos-1;
 
 		      info=alignments[i][0]+";Length="+std::to_string(alt.size()-1)+";Type=INS;AlleleFraction=.";
 		      printIndel=alignments[i][2]+"\t"+std::to_string(posIns)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
@@ -802,7 +804,7 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
 
 		      //subtract 1 from reference size because ref sequence includes the base before the deletion
-		      posDel=refPos-(ref.size()-1);
+		      posDel=refPos-(ref.size());
 
 		      info=alignments[i][0]+";Length="+std::to_string(ref.size()-1)+";Type=DEL;AlleleFraction=.";
 		      printIndel=alignments[i][2]+"\t"+std::to_string(posDel)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
@@ -858,7 +860,7 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
 		  */
 
-		  posIns=refPos-(alt.size()-1);
+		  posIns=refPos-1;
 
 		  info=alignments[i][0]+";Length="+std::to_string(alt.size()-1)+";Type=INS;AlleleFraction=.";
 		  printIndel=alignments[i][2]+"\t"+std::to_string(posIns)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
