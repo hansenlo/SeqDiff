@@ -101,8 +101,12 @@ public:
   
   uint_fast64_t numberDiff(std::vector<std::vector<char>> &alignmentMatrix, int row1, int row2, int start1, int start2, int &sizeAligned, int readSize); //Given the alignment matrix of reads and the row index and start positition of the 2 reads calculate percent difference of the 2 reads for the aligned regions sizeAligned is the number of aligned bases between the 2 reads the aligned bases may not necassarily match
 
-  std::string assembleContig(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, double &nucCtr, double &badColCtr, int cutoffMinNuc, double &Nctr); //given a matrix of aligned reads merge the columns into a contig also provided is a vector of rows that should 
-  //be used in the assembly rows indexes not listed in the vector will be ignored
+   //given a matrix of aligned reads merge the columns into a contig also provided is a vector of rows that should 
+  //be used in the assembly rows indexes not listed in the vector will be ignored 
+  //also returned is the positions of the Ns in the contig
+  std::string assembleContig(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, double &nucCtr, double &badColCtr, int cutoffMinNuc, double &Nctr);
+  
+  //std::vector<double> &Npositions
 
   void getDistanceGraph(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &startMatrix, Graph &numMatches, int readSize); //given an alignment matrix return the matrix of distances between pairs of reads startMatrix is the start position of each read in the alignment matrix
 
@@ -111,6 +115,10 @@ public:
 
   //debugging function only will print the alignment Matrix for the set of rows passed to it 
   void printMatrix(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, double &percentBadCol, std::string &clusterID, std::ofstream &debugging); 
+ 
+  //checks to see if columns that are Ns are approximately 50% to different bases if so will return contigs for both cases if successfull function will return a 1 and a vector of new contigs
+  bool extractHetro(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, std::vector<std::string> &newContigs,  std::vector<std::string> &newIDs); 
+
 
 
 //function to check the quality of the assembled contig returns through the parameter 

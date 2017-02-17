@@ -462,6 +462,14 @@ void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, in
 	{
 	  contigs.push_back(combinedNuc);
 	  
+	  //if percentNs is very low meaning but not zero the cluster can be called with very high accuracy except for a few areas check those few areas
+	  //if the nucleotide frequency is in general 50% in those areas create a contig with both alternatives. 
+	  
+	  if(percentNs>0 && percentNs<0.03)
+	    {
+	      
+	    }
+
 	}
 
 
@@ -516,7 +524,9 @@ void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, in
 		  clusterCtr++;
 
 		  combinedNuc=assembleContig(matrix, cluster, nucCtr, badColCtr, cutoffMinNuc, Nctr);
-
+		  
+		  
+		  
 		  //cerr<<"contig of subcluster is "<<combinedNuc<<endl;
 
 		  checkContig(combinedNuc, readSize, badColCtr, Nctr, percentBadCol, percentNs);
@@ -621,7 +631,120 @@ void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, in
 
 }
 
+/*
+ //checks to see if columns that are Ns are approximately 50% to different bases if so will return contigs for both cases if successfull function will return a 1 and a vector of new contigs
+  bool ReadCluster::extractHetro(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, std::vector<std::string> &newContigs,  std::vector<std::string> &newIDs)
+  {
+    
+    
+    bool flag;
+    int numCol, i, j, k, sizeReadsToUse, indexMax, posN;
+    vector<int> nuc(4, 0); //A T G C
+    string allNucs="ATGC";
 
+    string validChar = "ACGTacgt";
+  
+    flag=false;
+
+    Nctr=0; //counter to keep track of number of Ns in the contig getting assembled
+
+    badColCtr=0;
+
+    numCol=alignmentMatrix[0].size(); //all rows are the same size
+    sizeReadsToUse=rowsToAssemble.size();
+
+    int currentRow=0; //index into the current rows to assemble vector
+
+    for(i=0; i<; i++)
+      {
+      
+	nuc[0]=0;
+	nuc[1]=0;
+	nuc[2]=0;
+	nuc[3]=0;
+
+	nucCtr=0;
+      
+      //for every column run through all the rows that will be used in this assembly
+	for(k=0; k<sizeReadsToUse; k++)
+	{
+	  j=rowsToAssemble[k]; //j is row index to use in assembly
+
+	  //cerr<<"row is "<<j<<endl;
+
+  
+	  switch(alignmentMatrix[j][i])
+	    {
+	    case 'A' :
+	      nuc[0]=nuc[0]+1;
+	      nucCtr++;
+	      break;
+		    
+	    case 'a' :
+	      nuc[0]=nuc[0]+1;
+	      nucCtr++;
+		      
+	      break;
+		   
+	    case 'T' :
+	      nuc[1]=nuc[1]+1;
+	      nucCtr++;
+	      break;
+		    
+	    case 't' :
+	      nuc[1]=nuc[1]+1;
+	      nucCtr++;
+	      break;
+		    
+	    case 'G' :
+	      nuc[2]=nuc[2]+1;
+	      nucCtr++;
+	      break;
+	      
+	    case 'g' :
+	      nuc[2]=nuc[2]+1;
+	      nucCtr++;
+	      break;
+		      
+	    case 'C' :
+	      nuc[3]=nuc[3]+1;;
+	      nucCtr++;
+	      break;
+
+	    case 'c' :
+	      nuc[3]=nuc[3]+1;
+	      nucCtr++;
+	      break;
+		      
+		  
+	    }
+
+
+	}
+
+      
+
+
+     
+
+      indexMax=-1;
+      //indexMax=distance(nuc.begin(), std::max_element(nuc.begin(), nuc.end()));
+
+      //sort in descending order
+      std::sort(nuc.rbegin(), nuc.rend()); 
+      indexMax=nuc[0];
+
+  
+
+
+      }
+  
+      
+
+
+  }
+
+*/
 
 
  //Given the alignment matrix of reads and the row index and start positition of the 2 reads calculate percent
@@ -684,6 +807,8 @@ uint_fast64_t ReadCluster::numberDiff(vector<vector<char>> &alignmentMatrix, int
   return numMatches;
 
 }
+
+
 
 string ReadCluster::assembleContig(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, double &nucCtr, double &badColCtr, int cutoffMinNuc, double &Nctr)
 {

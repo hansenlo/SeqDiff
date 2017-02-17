@@ -94,6 +94,21 @@ void readKmers();
 
 const int bitWord=16;
 
+/*usage
+
+//a "d" means to deduplicate a "c" means to call Variants 
+
+//the inputFile to depulicate is a vcf file
+
+//the input file to call variants is a sam alignment file
+
+callZygosity d/c inputFile
+
+
+
+
+ */
+
 int main(int argc, char *argv[] )
 {
 
@@ -123,23 +138,30 @@ int main(int argc, char *argv[] )
   //parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/temp.vcf"); 
 
 
-  
+  string flag=argv[1];
+  string inputFile=argv[2];
   
 
-
-  cerr<<"Starting to read in genome \n";
+  
 
   unordered_map<string, string> genome;
 
+  if(flag=="c")
+    {
+
+      cerr<<"Starting to read in genome \n";
 					  
-  //  readInFasta(genome, "/data/Genomes/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
+      readInFasta(genome, "/data2/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
 
-  cerr<<"starting to call indels"<<endl;
+  //cerr<<"starting to call indels"<<endl;
 
-  //callIndels("/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs.sam", 15, genome, 0.1);
-  
-  //return(0);
+      callIndels(inputFile, 20, genome, 0.05);
+	
+      return(0);
+    }
 
+  if(flag=="d")
+    {
 
 	  //100 is the number of reference sequences to append to the vcf record 
   //  parseVcfAppendSeq(vcfResults, refSeq, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/structuralVariant_Deletions.vcf",  genome, 100, 45);
@@ -149,20 +171,20 @@ int main(int argc, char *argv[] )
 
   //   parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/SimulatedDataOutput200bpReads/SV_Deletions_seq.vcf"); 
 
-  parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/platinumGenomeChr21/temp.vcf"); 
+      parseVcf(vcfResults, inputFile); 
 
 
   //parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/SimulatedDataOutput/SV_calls.vcf"); 
 
-  cerr<<"removing duplicates file needs to be sorted!"<<endl;
+      cerr<<"removing duplicates file needs to be sorted!"<<endl;
+  
+      removeDuplicates(vcfResults, 0);
 
-  removeDuplicates(vcfResults, 0);
+      cerr<<"duplicates removed "<<endl;
 
-  cerr<<"duplicates removed "<<endl;
+      printVcf(vcfResults, "deDuplicatedVariants.vcf");
 
-  printVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/platinumGenomeChr21/foo.vcf");
-
-  cerr<<"reading in duplicated file adding genomic sequence "<<endl;
+      cerr<<"reading in duplicated file adding genomic sequence "<<endl;
 
   //parseVcfAppendSeq(vcfResults, refSeq, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/SimulatedDataOutput/deDuplicated.vcf",  genome, 100, 45);
 
@@ -170,8 +192,10 @@ int main(int argc, char *argv[] )
 
 
 
-    return(0);
+      return(0);
 
+
+    }
 	  /*
 	  cerr<<"reached this point started alternate Seq generation "<<endl;
 
@@ -285,7 +309,7 @@ samePositionCtr=0;
 		    continue;
 		  }
 
-		if(i % 1000==0)
+		if(i % 1000000==0)
 		  {
 		    
 		    cerr<<"number of records processed is "<<i<<endl;
@@ -530,6 +554,7 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
   int i, k;
   string info, printIndel, printDel; 
+  double sizeHardClipped, sizeSoftClipped;
 
   for(i=0; i<alignments.size(); i++)
     {
@@ -570,6 +595,9 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
       //ref.push_back(genome[chr][refPos]);
 
 
+      sizeHardClipped=0;
+      sizeSoftClipped=0;
+
       for(j=0; j<cigar.size(); j++)
 	{
 	  if(isdigit(cigar[j]))
@@ -586,9 +614,14 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 	      if(cigar[j]=='H')
 		{
 		  allDigits="";
+		  sizeHardClipped+=sizeOperation;
+
 
 		}else if(cigar[j]=='S')
 		{
+
+		  sizeSoftClipped+=sizeOperation;
+
 		  //cerr<<"testing is successful! "<<allDigits<<endl;
 		  readPos+=sizeOperation;
 		  allDigits="";
@@ -646,6 +679,14 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 	  cerr<<"Parser will only recognize cigar operations M/S/H/I/D/=/X"<<endl;
 	  cerr<<"Aligner may be using other cigar operations "<<endl;
 	}
+
+      //if hard or soft clipping is greater than 30% of the contig than do not use that contig for indel calling
+      if(((sizeSoftClipped/readAlign.size())>0.3) || ((sizeHardClipped/readAlign.size())>0.3) )
+	{
+	  continue;
+	}
+
+
 
       
       string ref="";
@@ -950,7 +991,7 @@ void parseSam(vector<vector<string>> &sam, string samFile, int mapCutoff)
 	{
 	  getline(samRecords, line);
 
-	  if(ctr % 100000==0)
+	  if(ctr % 1000000==0)
 	    {
 	      cerr<<"number of sam records processed is "<<sam.size()<<endl;
 	    }
@@ -1016,7 +1057,7 @@ void parseVcf(vector<vector<string>> &vcf, string vcfFile)
 	{
 	  getline(vcfRecords, line);
 
-	  if(ctr % 100000==0)
+	  if(ctr % 1000000==0)
 	    {
 	      cerr<<"number of vcf records is "<<vcf.size()<<endl;
 	    }
@@ -2417,7 +2458,7 @@ samePositionCtr=0;
        }
 
      
-     if(i % 1000==0)
+     if(i % 1000000==0)
        {		    
 	 cerr<<"number of records processed is "<<i<<endl;
        }
@@ -2431,10 +2472,7 @@ samePositionCtr=0;
 	 //if variants are at the same location in the genome and they are the same type and size then discard all but one of them 
 	 if( (vcfResults[i][0]==vcfResults[i+1][0] ) )
 	   {
-
 	     
-
-
 	       int diff=abs((stoull(vcfResults[i][1], NULL, 10)-stoull(vcfResults[i+1][1], NULL, 10)));
 
 	       //cerr<<"i is "<<i<<" "<<vcfResults[i][7]<<endl;
@@ -2529,7 +2567,26 @@ samePositionCtr=0;
 	     if(samePosition)
 	       {
 
+
 		 sameIndex=i-samePositionCtr;
+
+		 /*
+		 if(vcfResults[i][1]=="1530270")
+		   {
+		
+		     cerr<<"sameIndex is "<<sameIndex<<endl;
+		     cerr<<"samePositionCtr is "<<samePositionCtr<<endl;
+
+		     cerr<<vcfResults[i][7]<<" i "<<vcfResults[i][4]<<endl;
+		     cerr<<vcfResults[i-1][7]<<" i-1  "<<vcfResults[i-1][4]<<endl;
+		     cerr<<vcfResults[i-2][7]<<" i-2  "<<vcfResults[i-2][4]<<endl;
+		     cerr<<vcfResults[i-3][7]<<" i-3  "<<vcfResults[i-3][4]<<endl;
+
+		     cerr<<"sameIndex is "<<vcfResults[sameIndex][7]<<vcfResults[sameIndex][4]<<endl;
+		
+		   }
+		 */
+
 		
 		 int max=0;
 		 int j;
@@ -2537,9 +2594,32 @@ samePositionCtr=0;
 		 //delete the duplicates
 		 //vcfResults.erase(vcfResults.begin()+sameIndex, vcfResults.begin()+i);
 
-		 for(j=sameIndex; j<i; j++)
+		 bool foundGoodSeq=false; //variable set to false unless both alternate and ref sequence contains no Ns
+		 std::size_t found;
+		 for(j=sameIndex; j<=i; j++)
 		   {
-		     vcfResults[j][0]="-";
+
+		     if(foundGoodSeq==false)
+		       {
+
+		     //first check the reference sequence seeing if N is present
+			 found=vcfResults[j][3].find_first_of("N");
+			 if(found==std::string::npos)
+			   {
+			 //now check the alternate seqeunce seeing if N is present
+			     found=vcfResults[j][4].find_first_of("N");
+			     if(found==std::string::npos)
+			       {
+				 foundGoodSeq=true;
+				 continue;
+			       }
+		       
+			   }
+		       
+		       }
+		    
+		     
+			 vcfResults[j][0]="-";
 		   }
 	 
 		 samePosition=false;

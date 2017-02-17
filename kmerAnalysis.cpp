@@ -783,7 +783,7 @@ void countUniqueKmers(sparse_hash_map<uint_fast64_t, int, customHash>  &controlK
   seqFile.close();
 }
 
-void readUniqueKmers(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqueKmers,  char nextLineFlag, string inputFile, int kmerSize, int ctrCutoff)
+void readUniqueKmers(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqueKmers,  char nextLineFlag, string inputFile, int kmerSize, int ctrCutoff)
 {
   ifstream seqFile;
   string line, qualityScores, temp, foo, word, kmer;
@@ -1262,7 +1262,7 @@ void filterClusters(std::unordered_map<double, double > &linkClusters, //hash ta
 void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work 
 		    dense_hash_map<std::bitset<bitSetSize>, uint_fast32_t, stdHash> &clusterKmers, //hash table key is kmer value is the cluster that kmer belongs to
 		    dense_hash_map<uint_fast32_t, int, stdHash> &clusterFiles,  //hash table key is a cluster id value is the index into the vector of output file names
-		    dense_hash_map<std::bitset<bitSetSize>, int, stdHash>  &uniqueKmers, //hash table key is a kmer that is unique to the exp read library value is the number of times kmer occurs in experiment read library
+		    spp::sparse_hash_map<std::bitset<bitSetSize>, int, stdHash>  &uniqueKmers, //hash table key is a kmer that is unique to the exp read library value is the number of times kmer occurs in experiment read library
 		    ofstream &uniqueOut, //ofstream object file handler contains location of output file for all unique reads
 		    int kmerSize, //kmer size
 		    uint_fast64_t &clusterCtr, //count of how many clusters there currently are will be shared among threads
@@ -1495,23 +1495,29 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 	      if(iter!=uniqueKmers.end() || revIter!=uniqueKmers.end() )
 		{
 
-	
-		  //if any unique kmer is larger than the cutoff do not use that read
-		  if(iter->second > 2000 || revIter->second > 2000)
-		    {
-		      break;
-		    }
 
-		 
 		  //getting the unique kmer with the highest count 
 		  if(iter!=uniqueKmers.end())
 		    {
+		       if(iter->second > 2000)
+			{
+
+			  break;
+			}
+
 		      if(maxCount<uniqueKmers[key])
 			{
 			  maxCount=uniqueKmers[key];
 			}
 		    }else if(revIter!=uniqueKmers.end())
 		    {
+
+		      if(revIter->second > 2000)
+			{
+
+			  break;
+			}
+
 		      if(maxCount<uniqueKmers[reversedKey])
 			{
 			  maxCount=uniqueKmers[reversedKey];
@@ -1599,7 +1605,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		{ 
 		  //continue;
 
-             #pragma omp critical(END_LINK_CLUSTER_COLLISIONS)
+#pragma omp critical(END_LINK_CLUSTER_COLLISIONS)
 		  {
 		  
 		  if(isUnique) //if the current kmer is unique
@@ -1652,6 +1658,10 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		 
 						    */
 
+						  
+						  
+
+						    //uncomment
 						    linkClusters[newClusterIndex]=firstClusterIndex;
 					    //}
 						  }
@@ -1676,7 +1686,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 					     uniqueReadsBuffer.push_back(to_string(positionFirstClusterIndex)); //store the max unique word count
 				*/
 
-
+					    //uncomment
 					    linkClusters[newClusterIndex]=firstClusterIndex;
 					    //}
 
@@ -1786,7 +1796,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 						 uniqueReadsBuffer.push_back(to_string(positionFirstClusterIndex)); //store the max unique word count
 						*/
 
-
+						//uncomment
 						linkClusters[newClusterIndex]=firstClusterIndex;
 					  //}
 
@@ -1816,7 +1826,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 					    */
 
 
-
+					    //uncomment
 					    linkClusters[newClusterIndex]=firstClusterIndex;
 					  }
 					    //}
@@ -1896,7 +1906,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
  
 		    } //end brace for isUnique
 		
-		}
+		  }
 
 
 		  //if have obtained the set of all possible unique kmers or reached the end of the read
@@ -1966,7 +1976,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
       
 		  //break;
 		}
-		  
+	      
 		 
 	      //if have already examined every possible novel word associated with a variant on the read then reset and start looking at the rest of the read for variants
 	      if(distanceFirstKey>=kmerSize)
@@ -1978,7 +1988,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		  firstKey.reset();
 		  maxCount=0;
 		}
-			      
+	      	      
 		  
 
 		}
@@ -2038,7 +2048,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 //void getReads(sparse_hash_map<uint_fast64_t, int, customHash> &uniqueKmers, sparse_hash_map<uint_fast64_t, ReadCluster *, customHash> &readClusters, char nextLineFlag, string inputFile, int kmerSize, dense_hash_map<uint_fast64_t, uint_fast64_t, customHash> &masterKey )
 
-vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqueKmers, int numFiles, char nextLineFlag, string inputFile, int kmerSize)
+vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqueKmers, int numFiles, char nextLineFlag, string inputFile, int kmerSize)
 {
   ifstream seqFile;
   string line, header, tempLine, qualityScore;
@@ -2115,7 +2125,7 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
     {
       //line="/home/massa/Temp/file"+to_string(i)+".dat";
 
-      line="/data/Temp/"+to_string(i)+".dat";
+      line="/data2/Temp/"+to_string(i)+".dat";
 
       //line="/data1/HEM0013-131-LYMPH.bam.aspera-env et al/Temp/"+to_string(i)+".dat";
       fileNames.push_back(line);
@@ -2133,7 +2143,7 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
   //ofstream uniqueOut("/data1/HEM0013-131-LYMPH.bam.aspera-env et al/uniqueReads.fastq");
   //ofstream uniqueOut("/data/Sequencing/kmerAnalysis/uniqueReads.fastq");
  
-  string uniqueReadFile="/data/uniqueReads.fastq";
+  string uniqueReadFile="/data3/uniqueReads.fastq";
 
   ofstream uniqueOut(uniqueReadFile);
 
@@ -2240,7 +2250,7 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
    
 
   loadedFileFlag=0;
-  thread_count=20;
+  thread_count=6;
   lineCtr=1;
   chunkCtr=0;
   maxChunksWork=10;
@@ -2500,7 +2510,7 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
 
 
   
-  /*     
+       
   ofstream debuggingLinkingBefore("debuggingLinkingBeforeFiltering.dat");
 
 
@@ -2520,10 +2530,10 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
    debuggingLinkingBefore.close();
   
   
-  */
+  
 
 
-  int maxConnectivity=4;
+  int maxConnectivity=10;
   //filtering out bad clusters
   filterClusters(linkClusters, maxConnectivity);
 
@@ -2546,7 +2556,7 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
   //  std::unordered_map<long, long>::iterator myHashIteratorTemp;
   
   
-  /*
+  
    //unordered_map<uint_fast64_t, char>::iterator myHashIterator;
   cerr<<"started printing link clusters hash table "<<endl;
 
@@ -2558,7 +2568,7 @@ vector<string> getReads(dense_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqu
   
    debuggingLinking.close();
   
-  */
+  
    
 
   
