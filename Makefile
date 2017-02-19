@@ -1,5 +1,6 @@
 CC=/usr/bin/g++-4.8
-CFLAGS=-O3 -std=c++11 -I -Wno-deprecated -fopenmp $(DEBUG)
+#CFLAGS=-O3 -std=c++11 -I -Wno-deprecated -fopenmp $(DEBUG)
+CFLAGS=-std=c++11 -I -Wno-deprecated -fopenmp $(DEBUG)
 OBJS=variantFinder.o ReadCluster.o spooky.o kmerAnalysis.o utilities.o
 DEBUG=-g
 

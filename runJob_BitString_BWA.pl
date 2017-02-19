@@ -42,9 +42,9 @@ print "$splitLine[$#splitLine]\n";
 
 $splitLine[$#splitLine]=~m/(.*).fastq$/;
 
-$header="unique_".$1."_noMergingOldWay";
+#$header="unique_".$1."_noMergingOldWay";
 
-#$header="unique_".$1."_mergingNewWay";
+$header="unique_".$1."_mergingNewWay";
 
 
 $dataset=$1;
@@ -108,9 +108,9 @@ if(1==1)
 
 #$cmd="time ./findDiff_BitString_HashTableVer $controlFile $file  31 0 $cutoff temp.dat > "."/home/hansenlo/SeqDiff/Results/".$outputUnique;
 
-#$cmd="time ./variantFinder $expKmerCounts $expFastq 45 > temp.dat";
+$cmd="time ./variantFinder $expKmerCounts $expFastq 45 > temp.dat";
 
-$cmd="time /home/hansenlo/testSeqDiff/SeqDiff/variantFinder $expKmerCounts $expFastq 45 > temp.dat";
+#$cmd="time /home/hansenlo/testSeqDiff/SeqDiff/variantFinder $expKmerCounts $expFastq 45 > temp.dat";
 
 
 #$cmd="time ./temp $controlFile $file  31 0 $cutoff temp.dat > "."/data7/SeqDiffResults/Results/".$outputUnique;;

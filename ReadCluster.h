@@ -104,7 +104,8 @@ public:
    //given a matrix of aligned reads merge the columns into a contig also provided is a vector of rows that should 
   //be used in the assembly rows indexes not listed in the vector will be ignored 
   //also returned is the positions of the Ns in the contig
-  std::string assembleContig(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, double &nucCtr, double &badColCtr, int cutoffMinNuc, double &Nctr);
+  //startContig contains the starting column in the alignmentMatrix of where the contig is starting to be assembled
+  std::string assembleContig(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, double &nucCtr, double &badColCtr, int cutoffMinNuc, double &Nctr, double &startContig);
   
   //std::vector<double> &Npositions
 
@@ -114,10 +115,10 @@ public:
 
 
   //debugging function only will print the alignment Matrix for the set of rows passed to it 
-  void printMatrix(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, double &percentBadCol, std::string &clusterID, std::ofstream &debugging); 
+  void printMatrix(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, double &percentBadCol, std::string &clusterID, std::ofstream &debugging, double &percentNs); 
  
   //checks to see if columns that are Ns are approximately 50% to different bases if so will return contigs for both cases if successfull function will return a 1 and a vector of new contigs
-  bool extractHetro(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, std::vector<std::string> &newContigs,  std::vector<std::string> &newIDs); 
+  bool extractHetro(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, std::vector<std::string> &newContigs,  std::vector<std::string> &newIDs, int startContig); 
 
 
 
