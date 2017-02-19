@@ -107,6 +107,9 @@ if(1==1)
 
 $cmd="time ./variantFinder $expKmerCounts $expFastq 45 > temp.dat";
 
+#$cmd="time /home/hansenlo/LamiaSeqDiff/SeqDiff/variantFinder $expKmerCounts $expFastq 45 > temp.dat";
+
+
 #$cmd="time ./temp $controlFile $file  31 0 $cutoff temp.dat > "."/data7/SeqDiffResults/Results/".$outputUnique;;
 
 
@@ -299,97 +302,9 @@ system($cmd)==0
 }
 
 
-if(1==1)
-{
-
-
-#aligning all unique reads to artifical chromosome
-#$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header.".sam";
 
 
 
-##############################aligning all unique reads##################
-#aligning all unique reads 
-$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header.".sam";
-
-#$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."_refGenomeOnly.sam";
-
-#$blastDB="/home/hansenlo/Genomes/Bowtie2Index/hg19";
-
-
-#$blastDB="/data/BowtieIndex/elegansCe10";
-
-
-#$blastDB="/home/gabdank/genomes_fasta/elegans_W235_index";
-
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
-
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data/uniqueReads.fastq --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
-
-$cmd="time /data/bin/bwa-master/bwa mem -t 20 $blastDB"." /data/uniqueReads.fastq > $alignmentOutput";
-
-
-#fasta command DONT FORGET
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB -f "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
-
-
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/seqA "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
-
-
-print "#######cmd is $cmd\n\n";
-system($cmd)==0
-    or die "system $cmd failed\n";
-
-$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".bam";
-
-#converting alignments to bam format
-$cmd="samtools view -bS $alignmentOutput > ".$tempOut;
-print "#######cmd is $cmd\n\n";
-system($cmd)==0
-    or die "system $cmd failed\n";
-
-
-#sorting the aligments
-$tempIn=$tempOut;
-$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".sorted";
-
-#sorting bam files
-$cmd="samtools sort -m 40000000000 $tempIn $tempOut";
-print "#######cmd is $cmd\n\n";
-system($cmd)==0
-    or die "system $cmd failed\n";
-
-#creating an index
-$tempIn=$tempOut.".bam";
-
-$cmd="samtools index $tempIn";
-print "#######cmd is $cmd\n\n";
-system($cmd)==0
-    or die "system $cmd failed\n";
-
-#creating a unique alignment
-$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".sorted.unique.bam";
-$cmd="samtools view -bq 15 $tempIn > $tempOut";
-print "#######cmd is $cmd\n\n";
-system($cmd)==0
-    or die "system $cmd failed\n";
-
-#index the unique alignment 
-$tempIn=$tempOut;
-$cmd="samtools index $tempIn";
-print "#######cmd is $cmd\n\n";
-system($cmd)==0
-    or die "system $cmd failed\n";
-
-
-#convert to bed file
-$tempIn=$tempOut;
-$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".sorted.unique.bed";
-$cmd="bamToBed -i $tempIn > $tempOut";
-print "#######cmd is $cmd\n\n";
-system($cmd)==0
-    or die "system $cmd failed\n";
-}
 
 
 
@@ -534,6 +449,107 @@ system($cmd)==0
 }
 
 
+
+
+
+
+
+
+
+if(1==1)
+{
+
+
+#aligning all unique reads to artifical chromosome
+#$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header.".sam";
+
+
+
+##############################aligning all unique reads##################
+#aligning all unique reads 
+$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header.".sam";
+
+#$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."_refGenomeOnly.sam";
+
+#$blastDB="/home/hansenlo/Genomes/Bowtie2Index/hg19";
+
+
+#$blastDB="/data/BowtieIndex/elegansCe10";
+
+
+#$blastDB="/home/gabdank/genomes_fasta/elegans_W235_index";
+
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data/uniqueReads.fastq --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+
+$cmd="time /data/bin/bwa-master/bwa mem -t 20 $blastDB"." /data/uniqueReads.fastq > $alignmentOutput";
+
+
+#fasta command DONT FORGET
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB -f "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+
+
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/seqA "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+
+
+print "#######cmd is $cmd\n\n";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".bam";
+
+#converting alignments to bam format
+$cmd="samtools view -bS $alignmentOutput > ".$tempOut;
+print "#######cmd is $cmd\n\n";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+
+#sorting the aligments
+$tempIn=$tempOut;
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".sorted";
+
+#sorting bam files
+$cmd="samtools sort -m 40000000000 $tempIn $tempOut";
+print "#######cmd is $cmd\n\n";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+#creating an index
+$tempIn=$tempOut.".bam";
+
+$cmd="samtools index $tempIn";
+print "#######cmd is $cmd\n\n";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+#creating a unique alignment
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".sorted.unique.bam";
+$cmd="samtools view -bq 15 $tempIn > $tempOut";
+print "#######cmd is $cmd\n\n";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+#index the unique alignment 
+$tempIn=$tempOut;
+$cmd="samtools index $tempIn";
+print "#######cmd is $cmd\n\n";
+system($cmd)==0
+    or die "system $cmd failed\n";
+
+
+#convert to bed file
+$tempIn=$tempOut;
+$tempOut="/data5/SeqDiffResults/Results/Alignment/".$header.".sorted.unique.bed";
+$cmd="bamToBed -i $tempIn > $tempOut";
+print "#######cmd is $cmd\n\n";
+system($cmd)==0
+    or die "system $cmd failed\n";
+}
+
+
+
 #######################now working with contig edges###################
 
     my $alignmentFile=shift;
@@ -542,7 +558,7 @@ system($cmd)==0
 
 print "starting to filter the alignments \n";
 
-#&filterAlignments($alignmentOutput, 0.2, $contigs);
+&filterAlignments($alignmentOutput, 0.2, $contigs);
 
 
 print "Starting iterative alignment\n";
@@ -555,7 +571,7 @@ print "Starting iterative alignment\n";
 #&iterativeAlignment("/data5/SeqDiffResults/Results/unique_allPlatinum_contigs.fasta", 20, 80,  $blastDB, $header);
 
 my $mappingQualityCutoff=35;
-#&iterativeAlignment("clippedContigs.fa", 20, 60,  $blastDB, $header, $mappingQualityCutoff);
+&iterativeAlignment("clippedContigs.fa", 20, 80,  $blastDB, $header, $mappingQualityCutoff);
 
 #&iterativeAlignment($contigs, 20, 180,  $blastDB, $header, $mappingQualityCutoff);
 
@@ -571,7 +587,7 @@ print "Starting to extend alignments\n";
 
 #&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/unique_allPlatinum_contigs.fasta");
 
-#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", $contigs);
+&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", $contigs);
 
 #&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/cElegans10/allChr.fa", $contigs);
 
