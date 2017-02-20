@@ -94,6 +94,21 @@ void readKmers();
 
 const int bitWord=16;
 
+/*usage
+
+//a "d" means to deduplicate a "c" means to call Variants 
+
+//the inputFile to depulicate is a vcf file
+
+//the input file to call variants is a sam alignment file
+
+callZygosity d/c inputFile
+
+
+
+
+ */
+
 int main(int argc, char *argv[] )
 {
 
@@ -123,23 +138,30 @@ int main(int argc, char *argv[] )
   //parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/temp.vcf"); 
 
 
-  
+  string flag=argv[1];
+  string inputFile=argv[2];
   
 
-
-  cerr<<"Starting to read in genome \n";
+  
 
   unordered_map<string, string> genome;
 
+  if(flag=="c")
+    {
+
+      cerr<<"Starting to read in genome \n";
 					  
-  //readInFasta(genome, "/data/Genomes/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
+      readInFasta(genome, "/data/Genomes/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
 
   //cerr<<"starting to call indels"<<endl;
 
-	// callIndels("/data5/SeqDiffResults/Results/Alignment/unique_allReads_HG002_leniantClusterFilter_contigs.sam", 20, genome, 0.05);
-  
-	//return(0);
+      callIndels(inputFile, 20, genome, 0.05);
+	
+      return(0);
+    }
 
+  if(flag=="d")
+    {
 
 	  //100 is the number of reference sequences to append to the vcf record 
   //  parseVcfAppendSeq(vcfResults, refSeq, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/structuralVariant_Deletions.vcf",  genome, 100, 45);
@@ -149,20 +171,20 @@ int main(int argc, char *argv[] )
 
   //   parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/SimulatedDataOutput200bpReads/SV_Deletions_seq.vcf"); 
 
-  parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/HG002Output/temp.vcf"); 
+      parseVcf(vcfResults, inputFile); 
 
 
   //parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/SimulatedDataOutput/SV_calls.vcf"); 
 
-  cerr<<"removing duplicates file needs to be sorted!"<<endl;
+      cerr<<"removing duplicates file needs to be sorted!"<<endl;
+  
+      removeDuplicates(vcfResults, 0);
 
-  removeDuplicates(vcfResults, 0);
+      cerr<<"duplicates removed "<<endl;
 
-  cerr<<"duplicates removed "<<endl;
+      printVcf(vcfResults, "deDuplicatedVariants.vcf");
 
-  printVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/HG002Output/foo.vcf");
-
-  cerr<<"reading in duplicated file adding genomic sequence "<<endl;
+      cerr<<"reading in duplicated file adding genomic sequence "<<endl;
 
   //parseVcfAppendSeq(vcfResults, refSeq, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/SimulatedDataOutput/deDuplicated.vcf",  genome, 100, 45);
 
@@ -170,8 +192,10 @@ int main(int argc, char *argv[] )
 
 
 
-    return(0);
+      return(0);
 
+
+    }
 	  /*
 	  cerr<<"reached this point started alternate Seq generation "<<endl;
 

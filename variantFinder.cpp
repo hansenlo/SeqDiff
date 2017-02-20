@@ -107,7 +107,9 @@ int main(int argc, char *argv[] )
 
   //  sparse_hash_map<bitset<bitSetSize>, int, stdHash> temp;
 
-  dense_hash_map<bitset<bitSetSize>, int, stdHash> uniqueKmers;
+  //dense_hash_map<bitset<bitSetSize>, int, stdHash> uniqueKmers;
+
+  spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash> uniqueKmers;
   
   
 
@@ -162,10 +164,12 @@ int main(int argc, char *argv[] )
    emptyKey.set(bitSetSize-1);
    
   //clusters.set_empty_key(-20);
-  uniqueKmers.set_empty_key(emptyKey);
+  //uniqueKmers.set_empty_key(emptyKey);
   //uniqueKmers.set_deleted_key(-2);
-  uniqueKmers.resize(100000000);
-  //  controlKmers.resize(10000000000);
+  //uniqueKmers.resize(100000000);
+  
+   uniqueKmers.reserve(450000000);
+//  controlKmers.resize(10000000000);
   
 
   //cerr<<"reached this point after set empty key"<<endl;
@@ -238,7 +242,7 @@ int main(int argc, char *argv[] )
 
     cerr<<"Number of files is "<<fileNames.size()<<endl;
 
-    int thread_count=20;
+    int thread_count=6;
     int tid;
 
 

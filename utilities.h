@@ -8,6 +8,7 @@
 
 #include<iostream>
 
+#include "sparsepp.h"
 
 #include<sparsehash/sparse_hash_map>
 #include<sparsehash/dense_hash_map>
@@ -20,7 +21,7 @@
 
 #include <unordered_map>
 
-#include<boost/dynamic_bitset.hpp>
+//#include<boost/dynamic_bitset.hpp>
 //#include <boost/functional/hash.hpp>
 
 #include<fstream>

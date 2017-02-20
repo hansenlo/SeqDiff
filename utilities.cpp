@@ -11,7 +11,7 @@ using std::endl;
 using std::ofstream;
 using std::ios;
 using std::cerr;
-using boost::dynamic_bitset;
+//using boost::dynamic_bitset;
 using std::ifstream;
 
 struct eqKey{
