@@ -43,6 +43,63 @@ void myReplace(std::string& str, const std::string& oldStr, const std::string& n
 }
 
 
+
+string int2String( uint_fast64_t number, int kmerSize)
+{
+  
+  int i, numberNuc;
+  string bitString, nucString, nucBit;
+
+  nucString="";
+  
+  std::bitset<64> bitRep(number);
+  
+  
+  bitString=bitRep.to_string();
+
+
+
+  for(i=64-(kmerSize*2); i<64; i+=2)
+    {
+      nucBit=bitString.substr(i, 2);
+      
+
+      if(nucBit=="00")
+	{
+
+	  nucString=nucString+"A";
+
+	}else if(nucBit=="11")
+	{
+	  nucString=nucString+"T";
+
+	}else if (nucBit=="10")
+	{
+	  nucString=nucString+"G";
+
+	}else if (nucBit=="01")
+	{
+	  nucString=nucString+"C";
+	}
+
+      
+    
+    }
+
+  //cout<<"nuc String is "<<nucString<<endl;
+  //cout<<"bit string is "<<bitString<<endl;
+
+  
+  return(nucString);
+  
+
+
+  //return bitString;
+}
+
+
+
+
 string bit2String( std::bitset<bitSetSize> &number, int kmerSize)
 {
   

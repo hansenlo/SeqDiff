@@ -71,22 +71,8 @@ int main(int argc, char *argv[] )
 
 
 
-  /*
-  vector<string> test;
-
-  test.push_back("/data/Temp/0.dat");
-
-  //test is the file containing the reads in a contig
-  //4 is the cutoff number of reads 
-  //20 is the kmer size used to assemble the reads into a contig
-    readInCluster(test[0], 4, 20);
-
-
-  //assembleContigs();
-
-  return(0);
-  */
-
+  
+  
    //sparse_hash_map<uint_fast64_t, int, customHash> uniqueKmers;
 
   //dense_hash_map<uint_fast64_t, int, customHash> uniqueKmers;
@@ -242,7 +228,7 @@ int main(int argc, char *argv[] )
 
     cerr<<"Number of files is "<<fileNames.size()<<endl;
 
-    int thread_count=6;
+    int thread_count=35;
     int tid;
 
 
@@ -253,6 +239,26 @@ int main(int argc, char *argv[] )
     ofstream debuggingMatrix("/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/debuggingMatrix.dat"); //location of where to put file containing the matrix of aligned reads used to assemble contigs
 
     
+    /*
+    vector<string> testAssembly;
+
+    testAssembly.push_back("/data2/Temp/0.dat");
+
+  //test is the file containing the reads in a contig
+  //4 is the cutoff number of reads 
+  //20 is the kmer size used to assemble the reads into a contig
+  //readInCluster(test[0], 4, 20);
+
+    cerr<<"starting to test cluster assembly "<<endl;
+    readInCluster(testAssembly[0], 4, 25, tid, contigOut, clusterID, debuggingMatrix);
+  //assembleContigs();
+
+  return(0);
+    */
+
+
+
+
     //parallizing the cluster assembly 
 #pragma omp parallel num_threads(thread_count) default(shared)	\
   private(tid, currentClusterFilePrivate)

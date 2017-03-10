@@ -124,4 +124,7 @@ void readInFasta(std::unordered_map<std::string, std::string> &genome, std::stri
 void getUniqueWordsContigs(google::dense_hash_map<std::bitset<bitSetSize>, int, stdHash>  &uniqueKmers, std::string contigFile, std::unordered_map<uint_fast64_t, std::vector< std::bitset<bitSetSize> >, stdHash> &pairedUniqueKmers);
 
 
+//function taks as input an integer and will return the kmer coded for by the integer
+std::string int2String(uint_fast64_t number, int kmerSize);
+
 #endif

@@ -42,7 +42,7 @@ print "$splitLine[$#splitLine]\n";
 
 $splitLine[$#splitLine]=~m/(.*).fastq$/;
 
-$header="unique_".$1;
+$header="unique_".$1."_test";
 
 $dataset=$1;
 
@@ -106,6 +106,9 @@ if(1==1)
 #$cmd="time ./findDiff_BitString_HashTableVer $controlFile $file  31 0 $cutoff temp.dat > "."/home/hansenlo/SeqDiff/Results/".$outputUnique;
 
 $cmd="time ./variantFinder $expKmerCounts $expFastq 45 > temp.dat";
+
+#$cmd="time ./variantFinder $expKmerCounts $expFastq 55 > temp.dat";
+
 
 #$cmd="time /home/hansenlo/LamiaSeqDiff/SeqDiff/variantFinder $expKmerCounts $expFastq 45 > temp.dat";
 
@@ -448,12 +451,57 @@ system($cmd)==0
 
 }
 
+#extending contig edges
+if(1==1)
+{
+
+#######################now working with contig edges###################
+
+    my $alignmentFile=shift;
+    my $cutoff=shift;
+    my $contigFile=shift;
+
+print "starting to filter the alignments \n";
+
+&filterAlignments($alignmentOutput, 0.2, $contigs);
+
+
+print "Starting iterative alignment\n";
+#iterativeAlignment($tempOutunMappPoorMap, 20, 80,  $blastDB, $header);
+
+#&iterativeAlignment("/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs_unMapped_poorlyMapped.fasta", 20, 80,  $blastDB, $header);
+
+#&iterativeAlignment("/data5/SeqDiffResults/Results/unique_platinumChr21_plusUnmapped_contigs.fasta", 20, 80,  $blastDB, $header);
+
+#&iterativeAlignment("/data5/SeqDiffResults/Results/unique_allPlatinum_contigs.fasta", 20, 80,  $blastDB, $header);
+
+my $mappingQualityCutoff=35;
+&iterativeAlignment("clippedContigs.fa", 20, 80,  $blastDB, $header, $mappingQualityCutoff);
+
+#&iterativeAlignment($contigs, 20, 180,  $blastDB, $header, $mappingQualityCutoff);
+
+
+print "Starting to extend alignments\n";
+
+#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "test.dat");
+
+
+#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs_unMapped_poorlyMapped.fasta");
+
+#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/unique_platinumChr21_plusUnmapped_contigs.fasta");
+
+#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/unique_allPlatinum_contigs.fasta");
+
+&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", $contigs);
+
+#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/cElegans10/allChr.fa", $contigs);
+
+#&extendAlignments("mappedReads_IDs.dat", 2, "/data6/sukrit/081216_MiSeq_MMB1newdel_genomeSeq/MappingToReference/MMB1genomeCIRC84.fasta", $contigs);
 
 
 
 
-
-
+}
 
 
 if(1==1)
@@ -548,50 +596,6 @@ system($cmd)==0
     or die "system $cmd failed\n";
 }
 
-
-
-#######################now working with contig edges###################
-
-    my $alignmentFile=shift;
-    my $cutoff=shift;
-    my $contigFile=shift;
-
-print "starting to filter the alignments \n";
-
-&filterAlignments($alignmentOutput, 0.2, $contigs);
-
-
-print "Starting iterative alignment\n";
-#iterativeAlignment($tempOutunMappPoorMap, 20, 80,  $blastDB, $header);
-
-#&iterativeAlignment("/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs_unMapped_poorlyMapped.fasta", 20, 80,  $blastDB, $header);
-
-#&iterativeAlignment("/data5/SeqDiffResults/Results/unique_platinumChr21_plusUnmapped_contigs.fasta", 20, 80,  $blastDB, $header);
-
-#&iterativeAlignment("/data5/SeqDiffResults/Results/unique_allPlatinum_contigs.fasta", 20, 80,  $blastDB, $header);
-
-my $mappingQualityCutoff=35;
-&iterativeAlignment("clippedContigs.fa", 20, 80,  $blastDB, $header, $mappingQualityCutoff);
-
-#&iterativeAlignment($contigs, 20, 180,  $blastDB, $header, $mappingQualityCutoff);
-
-
-print "Starting to extend alignments\n";
-
-#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "test.dat");
-
-
-#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs_unMapped_poorlyMapped.fasta");
-
-#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/unique_platinumChr21_plusUnmapped_contigs.fasta");
-
-#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/unique_allPlatinum_contigs.fasta");
-
-&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", $contigs);
-
-#&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/cElegans10/allChr.fa", $contigs);
-
-#&extendAlignments("mappedReads_IDs.dat", 2, "/data6/sukrit/081216_MiSeq_MMB1newdel_genomeSeq/MappingToReference/MMB1genomeCIRC84.fasta", $contigs);
 
 
 

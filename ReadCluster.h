@@ -70,7 +70,7 @@ private:
   std::vector<int> startPositions; //startPosition the kmer used to align the read with at least one other read in the cluster 
   //std::vector<bool> usedReads; //vector of boolean values each element of the vector represents one of the reads in the cluster. If a read has already been used in assembling the cluster its value is set to true
   
-
+  spp::sparse_hash_map<uint_fast64_t, bool, customHash> presentMultipleTimes; //hash table to keep track of which kmers are found at least twice in any read if a kmer is found at least twice in a read 
 
 public:
   ReadCluster()=default;
@@ -105,7 +105,8 @@ public:
   //be used in the assembly rows indexes not listed in the vector will be ignored 
   //also returned is the positions of the Ns in the contig
   //startContig contains the starting column in the alignmentMatrix of where the contig is starting to be assembled
-  std::string assembleContig(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, double &nucCtr, double &badColCtr, int cutoffMinNuc, double &Nctr, double &startContig);
+  //longestDistN contains the longest distance between Ns for the contig
+  std::string assembleContig(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, double &nucCtr, double &badColCtr, int cutoffMinNuc, double &Nctr, double &startContig, double &longestDistN);
   
   //std::vector<double> &Npositions
 
@@ -118,36 +119,48 @@ public:
   void printMatrix(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, double &percentBadCol, std::string &clusterID, std::ofstream &debugging, double &percentNs); 
  
   //checks to see if columns that are Ns are approximately 50% to different bases if so will return contigs for both cases if successfull function will return a 1 and a vector of new contigs
-  bool extractHetro(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, std::vector<std::string> &newContigs,  std::vector<std::string> &newIDs, int startContig); 
+  bool extractHetro(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, std::vector<std::string> &newContigs, int startContig, int cutoffMinNuc);
+ 
+
+  //trys to split a contig into two different contigs representing two different variants 
+  bool extractVariants(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, std::vector<std::string> &newContigs, double &startContig, int cutoffMinNuc, int readSize);
+ 
 
 
 
 //function to check the quality of the assembled contig returns through the parameter 
   //list several different metrics of how well the assembly worked
-  void checkContig(std::string &combinedNuc, int readSize, double &badColCtr, double &Nctr, double &percentBadCol, double &percentNs) 
+  bool checkContig(std::string &combinedNuc, int readSize, double &badColCtr, double &Nctr, double &percentBadCol, double &percentNs) 
   {                                                                               
 
     percentBadCol=(badColCtr/combinedNuc.length());
     percentNs=(Nctr/combinedNuc.length());
 
+    //return; //debugging must remove!!
+
  
     if(combinedNuc.length() < (readSize/2)) //if contig to short throw it out
       {
-	combinedNuc="0";
+	return(false);
+	//combinedNuc="0";
       }
 
     if(percentBadCol > 0.1) //if to many bad columns throw it out
       {
-	combinedNuc="0";
+
+	return(false);
+	//combinedNuc="0";
       }
 
   //if number of not confident nucleotide calls is greater than 10% of the contig throw it out
-    if(percentNs > 0.1)
+    if(percentNs > 0.05)
       {
-	combinedNuc="0";
+	return(false);
+	//combinedNuc="0";
       }
   
 
+    return(true);
   }
 
 

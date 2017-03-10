@@ -10,7 +10,6 @@ struct node {
   std::vector<std::string> qualityScores; //vector of strings contains the quality scores for each read use this for debugging purposes
 };
 
-
 inline void countKmers(google::sparse_hash_map<uint_fast64_t, int, customHash> &controlKmers, char nextLineFlag, std::string inputFile, int kmerSize);
 
 //void countUniqueKmers(std::vector <uint_fast64_t> &controlCtr1, std::vector <uint_fast64_t> &controlCtr2,   sparse_hash_map<uint_fast64_t, int, customHash>  &uniqueKmers,  char nextLineFlag, std::string inputFile, int kmerSize)
@@ -53,7 +52,6 @@ void sendClustersToFile(std::string &uniqueReadFile, //the file location where a
 //function will take a hash table of links to clusters and flag any clusters which have to many links to other clusters by putting a -1 for the value
 void filterClusters(std::unordered_map<double, double > &linkClusters, //hash table key is a cluster id the value is the cluster id that the key cluster should be merged with 
 		    int maxConnectivity); //max number of clusters that can be connected any more connections and the cluster is flagged as a bad cluster
-
 
 
 

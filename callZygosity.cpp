@@ -155,7 +155,7 @@ int main(int argc, char *argv[] )
 
   //cerr<<"starting to call indels"<<endl;
 
-      callIndels(inputFile, 20, genome, 0.05);
+      callIndels(inputFile, 15, genome, 0.05);
 	
       return(0);
     }
@@ -680,12 +680,13 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 	  cerr<<"Aligner may be using other cigar operations "<<endl;
 	}
 
+      /*
       //if hard or soft clipping is greater than 30% of the contig than do not use that contig for indel calling
       if(((sizeSoftClipped/readAlign.size())>0.3) || ((sizeHardClipped/readAlign.size())>0.3) )
 	{
 	  continue;
 	}
-
+      */
 
 
       

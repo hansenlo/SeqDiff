@@ -109,6 +109,8 @@ void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, in
   int numReads=readSeqs.size();
   int i, j, z, maxCtr, indexMax, posN, readSize;
 
+  double startContig;
+
   string combinedNuc;
   string allNucs="ATGC";
   bool flag=false;
@@ -158,7 +160,6 @@ void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, in
         continue;
       }
 
-
       int start=(numCol/2)-startPositions[i];
       int ctr=0;
       //cerr<<"start is "<<start<<endl;
@@ -207,8 +208,25 @@ void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, in
 //cerr<<endl;
     }
     
+
+
+double percentBadCol, percentNs;
+ 
+/*
   
+ std::vector<int> test(matrix.size());
+ std::iota(test.begin(), test.end(), 0); //for the initial assembly use all reads
   
+
+ combinedNuc=assembleContig(matrix, test, nucCtr, badColCtr, cutoffMinNuc, Nctr, startContig);
+
+ checkContig(combinedNuc, readSize, badColCtr, Nctr, percentBadCol, percentNs);
+
+
+printMatrix(matrix, test, combinedNuc, percentBadCol, clusterID[0], debugging, percentNs); //debugging only print alignment Matrix
+
+ return;
+*/
 
   char temp;
   int k;
@@ -246,6 +264,28 @@ void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, in
 		  kmer=HashIter->first;
 	      
 
+		  //check to see if the kmer was present more than once in any read if so do not use that kmer
+		  if(presentMultipleTimes.count(kmer)>0)
+		    {
+		      continue;
+		    }
+
+		  /*
+		  if(clusterID[0]=="25411")
+		    {
+		      cerr<<"all multiple kmers are "<<endl;
+		      
+		      for(auto iter=presentMultipleTimes.begin(); iter!=presentMultipleTimes.end(); iter++)
+			{
+			  cerr<<int2String(iter->first, 25)<<endl;
+			}
+		      
+
+		      cerr<<"kmer is "<<kmer<<endl;
+		      cerr<<"string representation is "<<int2String(kmer, 25)<<"\n\n\n";
+		    }
+		  */
+
 	      //cerr<<"for read "<<i<<" on kmer "<<kmer<<" kmer is "<<temp<<endl;
      
 	      //temp++;
@@ -270,23 +310,31 @@ void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, in
 				  index++;
 				}
 
-			      
-			      //check to make sure assembled read matches well with a neighboring read if it has to many mismatches do not use it
 			      int numMismatches=0;
 			      int sizeAligned=0;
-			      for(int y=0; y<readSeqs[j].size(); y++)
+			      
+			      //if only one read has been assembled than do not check that one read against a neighbor because it will not have any neighbors
+			      if(index<kmerPositions.size())
 				{
-				  if(matrix[j][startMatrix[j]+y]!='N' && matrix[index][startMatrix[j]+y]!='N') 
+
+			      //check to make sure assembled read matches well with a neighboring read if it has to many mismatches do not use it
+				  for(int y=0; y<readSeqs[j].size(); y++)
 				    {
-				      sizeAligned++;
-				      if(matrix[j][startMatrix[j]+y]!=matrix[index][startMatrix[j]+y])
+				      if(matrix[j][startMatrix[j]+y]!='N' && matrix[index][startMatrix[j]+y]!='N') 
 					{
-					  numMismatches++;
+					  sizeAligned++;
+					  if(matrix[j][startMatrix[j]+y]!=matrix[index][startMatrix[j]+y])
+					    {
+					      numMismatches++;
+					    }
+
 					}
 
 				    }
-
-				}
+				}else
+			      {
+				  numMismatches=0;
+			      }
 			      
 			      /*
 			       if(clusterID==228237)
@@ -415,13 +463,14 @@ void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, in
 
 
 
-      double startContig; 
+      double longestDistN=0;
       //Assembling the contig from the matrix of aligned reads
       std::vector<int> rowsToAssemble(matrix.size());
       std::iota(rowsToAssemble.begin(), rowsToAssemble.end(), 0); //for the initial assembly use all reads
 
-      combinedNuc=assembleContig(matrix, rowsToAssemble, nucCtr, badColCtr, cutoffMinNuc, Nctr, startContig);
+      combinedNuc=assembleContig(matrix, rowsToAssemble, nucCtr, badColCtr, cutoffMinNuc, Nctr, startContig, longestDistN);
   
+
 
       /*
 #pragma omp critical(DEBUGGING_CLUSTER)
@@ -452,32 +501,80 @@ void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, in
       */
 
       
-      double percentBadCol, percentNs;
+      bool goodContig=false;
+      
+       goodContig=checkContig(combinedNuc, readSize, badColCtr, Nctr, percentBadCol, percentNs);
 
 
-      checkContig(combinedNuc, readSize, badColCtr, Nctr, percentBadCol, percentNs);
+       
 
-      string printableClusterID=clusterID[0];
-    
-      printMatrix(matrix, rowsToAssemble, combinedNuc, percentBadCol, printableClusterID, debugging, percentNs); //debugging only print alignment Matrix
-
-      if(combinedNuc.compare("0")!=0)
+      if(goodContig==true)
 	{
 	  contigs.push_back(combinedNuc);
-	  
-	  //if percentNs is very low meaning but not zero the cluster can be called with very high accuracy except for a few areas check those few areas
-	  //if the nucleotide frequency is in general 50% in those areas create a contig with both alternatives. 
-
-	  /*
-	  if(percentNs>0 && percentNs<0.03)
-	    {
-	      
-	    }
-	  */
+	}else
+	{
+	  contigs.push_back("0");
 	}
 
 
-  if(combinedNuc.compare("0")==0) //if the contig is noisy it may be the cluster is impure try and find subclusters that assembly better
+      string printableClusterID=clusterID[0];
+      int oldSize;
+
+      if(percentNs>0 && percentNs<0.03 && goodContig==true)
+	{	  
+	  oldSize=contigs.size();
+	      
+	  extractHetro(matrix, rowsToAssemble, combinedNuc, contigs, startContig, cutoffMinNuc);
+	  
+	  if(contigs.size()>oldSize)
+	    {
+		
+	      
+	      clusterID.push_back(clusterID[0]+"_"+"0_hetro");
+	      clusterID.push_back(clusterID[0]+"_"+"1_hetro");
+
+	    }
+	}
+
+    
+      printMatrix(matrix, rowsToAssemble, combinedNuc, percentBadCol, printableClusterID, debugging, percentNs); //debugging only print alignment Matrix
+
+
+      
+
+
+      //if the contig is to noisy look to break down the cluster into two different variants
+	  if(goodContig==false && ((longestDistN/combinedNuc.size())>0.3)  && percentNs>0.03 && combinedNuc.size()>=readSize)
+	    {
+	      oldSize=contigs.size();
+	  
+	      //cout<<"Nctr is "<<Nctr<<" "<<combinedNuc<<" percentNs is "<<percentNs<<endl;
+
+	   
+
+
+	      extractVariants(matrix, rowsToAssemble, combinedNuc, contigs, startContig, cutoffMinNuc, readSize);
+
+	  
+	 
+
+	  if(contigs.size()>oldSize)
+	    { 
+	      if(clusterID[0]=="24459")
+		{
+		      cerr<<"successfully extracted variants"<<endl;
+		}
+
+
+
+	      clusterID.push_back(clusterID[0]+"_"+"0_splitVariant");
+	      clusterID.push_back(clusterID[0]+"_"+"1_splitVariant");
+
+	    }
+
+	}
+
+  if(goodContig==false) //if the contig is noisy it may be the cluster is impure try and find subclusters that assembly better
     {
       if(numReads>(2*cutoffMinNuc)) //making sure can break up the cluster into 2 or more clusters with the mininum number of reads to pass the cutoff
 	{
@@ -527,22 +624,29 @@ void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, in
 
 		  clusterCtr++;
 
-		  combinedNuc=assembleContig(matrix, cluster, nucCtr, badColCtr, cutoffMinNuc, Nctr, startContig);
+		  combinedNuc=assembleContig(matrix, cluster, nucCtr, badColCtr, cutoffMinNuc, Nctr, startContig, longestDistN);
 		  
 		  
 		  
 		  //cerr<<"contig of subcluster is "<<combinedNuc<<endl;
 
-		  checkContig(combinedNuc, readSize, badColCtr, Nctr, percentBadCol, percentNs);
+		  goodContig=checkContig(combinedNuc, readSize, badColCtr, Nctr, percentBadCol, percentNs);
 	      
 		  string subClusterID=clusterID[0]+"_"+std::to_string(clusterCtr);
 
 		  printMatrix(matrix, cluster, combinedNuc, percentBadCol, subClusterID, debugging, percentNs); //debugging only print alignment Matrix
 	  
+		  if(goodContig==true)
+		    {
 		  //adding the new contig to the set of contigs
-		  contigs.push_back(combinedNuc); 
-		  clusterID.push_back(subClusterID);
-		  
+		      contigs.push_back(combinedNuc); 
+		      clusterID.push_back(subClusterID);
+		    }else
+		    {
+		      contigs.push_back("0"); 
+		      clusterID.push_back(subClusterID);
+
+		    }
 		}
 
 	    }
@@ -637,21 +741,23 @@ void ReadCluster::mergeReads(std::vector<std::string> &contigs, int kmerSize, in
 
 
  //checks to see if columns that are Ns are approximately 50% to different bases if so will return contigs for both cases if successfull function will return a 1 and a vector of new contigs
-bool ReadCluster::extractHetro(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, std::vector<std::string> &newContigs,  std::vector<std::string> &newIDs, int startContig)
+bool ReadCluster::extractHetro(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, std::vector<std::string> &contigs, int startContig, int cutoffMinNuc)
   {
     
     
     bool flag;
-    int numCol, i, j, k, sizeReadsToUse, indexMax, posN, nucCtr;
-    vector<int> nuc(4, 0); //A T G C
+    int numCol, i, j, k, sizeReadsToUse, indexMax, posN;
+    vector<double> nuc(4, 0); //A T G C
     string allNucs="ATGC";
+
+    double nucCtr;
 
     string validChar = "ACGTacgt";
   
     vector<int> positionsN; // holds all the positions that sub occurs within str
 
     //find allNs in a contig
-    size_t pos = combinedNuc.find("N", 0);
+    double pos = combinedNuc.find("N", 0);
     while(pos != string::npos)
       {
 	positionsN.push_back(pos);
@@ -662,10 +768,22 @@ bool ReadCluster::extractHetro(std::vector<std::vector<char>> &alignmentMatrix, 
     int currentRow=0; //index into the current rows to assemble vector
 
 
+    numCol=alignmentMatrix[0].size(); //all rows are the same size
+    sizeReadsToUse=rowsToAssemble.size();
+
    
+
+    flag=false;
     for(i=0; i<positionsN.size(); i++)
       {
       
+	//only look at Ns that sit well inside the contig and are not close to either end
+	if( (((positionsN[i])/double(combinedNuc.size())) < 0.3) || (((positionsN[i])/double(combinedNuc.size())) > 0.7))
+	  {
+	    continue;
+	  }
+
+	
 	nuc[0]=0;
 	nuc[1]=0;
 	nuc[2]=0;
@@ -730,15 +848,100 @@ bool ReadCluster::extractHetro(std::vector<std::vector<char>> &alignmentMatrix, 
       
 
 
-      indexMax=-1;
+	//indexMax=-1;
       //indexMax=distance(nuc.begin(), std::max_element(nuc.begin(), nuc.end()));
 
       //sort in descending order
-      std::sort(nuc.rbegin(), nuc.rend()); 
-      indexMax=nuc[0];
-
+      //std::sort(nuc.rbegin(), nuc.rend()); 
       
-  
+	//sort the nuc vector but retain the index of the sorted vector
+      vector<size_t> idx(nuc.size());
+      iota(idx.begin(), idx.end(), 0);
+
+      // sort indexes based on comparing values in v
+      sort(idx.begin(), idx.end(),
+	   [&nuc](size_t i1, size_t i2) {return nuc[i1] < nuc[i2];});
+
+
+      /*
+      for(int z=0; z<nuc.size(); z++)
+	{
+	  cout<<nuc[z]<<endl;
+	}
+
+      cout<<"end of nuc count \n"<<endl;
+
+      for(int z=0; z<idx.size(); z++)
+	{
+	  cout<<idx[z]<<endl;
+	}	
+
+      cout<<"end if index count \n\n\n\n";
+      */
+
+
+
+      //check to make sure Ns are highly covered and that the nucleotides with the second and first highest counts are very close to fifty percent
+      if(nuc[idx[idx.size()-1]]>(2*cutoffMinNuc))
+	{
+
+	  if(((nuc[idx[idx.size()-1]]/nucCtr)>0.4) && ((nuc[idx[idx.size()-1]]/nucCtr)<0.6) )
+	    {
+	     
+	      if(((nuc[idx[idx.size()-2]]/nucCtr)>0.4) && ((nuc[idx[idx.size()-2]]/nucCtr)<0.6) )
+		{
+
+		  /*
+		   for(int z=0; z<nuc.size(); z++)
+		     {
+		       cout<<nuc[z]<<endl;
+		     }
+
+		   cout<<"end of nuc count \n"<<endl;
+		   
+		   for(int z=0; z<idx.size(); z++)
+		     {
+		       cout<<idx[z]<<endl;
+		     }	
+		   
+		   cout<<"end of index count \n\n\n\n";
+
+		  */
+
+		  if(flag==false)
+		    {
+
+		      contigs.push_back(combinedNuc);
+		      contigs.push_back(combinedNuc);
+		  //co
+		  //cout<<"N position is "<<newContigs[newContigs.size()-1][positionsN[i]]<<endl;
+		      
+		      flag=true;
+		    }
+
+		  
+		  if(flag==true)
+		    {
+		      contigs[contigs.size()-1][positionsN[i]]=allNucs[idx[idx.size()-1]];
+		      contigs[contigs.size()-2][positionsN[i]]=allNucs[idx[idx.size()-2]];
+
+		      //		      cerr<<"replacing it with "<<allNucs[idx[idx.size()-1]]<<" "<<allNucs[idx[idx.size()-2]]<<endl;
+		    }
+
+		  
+		  
+	      //newContigs.push_back(combinedNuc);
+	      //  newContigs[positionsN[i]]=allNucs[idx[idx.size()-1]];
+
+						    
+		}
+
+	    }
+
+	}
+      
+
+
 
 
       }
@@ -747,6 +950,240 @@ bool ReadCluster::extractHetro(std::vector<std::vector<char>> &alignmentMatrix, 
 
 
   }
+
+
+bool ReadCluster::extractVariants(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, std::vector<std::string> &contigs, double &startContig, int cutoffMinNuc, int readSize)
+{
+    
+    
+    bool flag;
+    int numCol, i, j, k, sizeReadsToUse, indexMax, posN;
+    vector<double> nuc(4, 0); //A T G C
+    string allNucs="ATGC";
+
+    double nucCtr;
+
+    string validChar = "ACGTacgt";
+  
+    vector<int> positionsN; // holds all the positions that sub occurs within str
+
+    //find allNs in a contig
+    double pos = combinedNuc.find("N", 0);
+    while(pos != string::npos)
+      {
+	positionsN.push_back(pos);
+	pos = combinedNuc.find("N",pos+1);
+      }
+
+
+    double smallestDist=10000000;
+    int indexSmallestDist=-1;
+    //go through the Ns looking for the one closest to the middle of the contig
+    for(i=0; i<positionsN.size(); i++)
+      {
+	if(abs(positionsN[i]-(combinedNuc.size()/2)) < smallestDist )
+	  {
+	    smallestDist=abs(positionsN[i]-(combinedNuc.size()/2));
+	    indexSmallestDist=i;
+	  }
+      }
+
+    if(indexSmallestDist==-1)
+      {
+	return(false);
+      }
+
+
+    numCol=alignmentMatrix[0].size(); //all rows are the same size
+    sizeReadsToUse=rowsToAssemble.size();
+
+   
+
+    flag=false;
+      
+
+	
+	nuc[0]=0;
+	nuc[1]=0;
+	nuc[2]=0;
+	nuc[3]=0;
+
+	nucCtr=0;
+      
+      //run through the 
+	for(k=0; k<sizeReadsToUse; k++)
+	{
+	  j=rowsToAssemble[k]; //j is row index to use in assembly
+  
+	  switch(alignmentMatrix[j][positionsN[indexSmallestDist]+startContig])
+	    {
+	    case 'A' :
+	      nuc[0]=nuc[0]+1;
+	      nucCtr++;
+	      break;
+		    
+	    case 'a' :
+	      nuc[0]=nuc[0]+1;
+	      nucCtr++;
+		      
+	      break;
+		   
+	    case 'T' :
+	      nuc[1]=nuc[1]+1;
+	      nucCtr++;
+	      break;
+		    
+	    case 't' :
+	      nuc[1]=nuc[1]+1;
+	      nucCtr++;
+	      break;
+		    
+	    case 'G' :
+	      nuc[2]=nuc[2]+1;
+	      nucCtr++;
+	      break;
+	      
+	    case 'g' :
+	      nuc[2]=nuc[2]+1;
+	      nucCtr++;
+	      break;
+		      
+	    case 'C' :
+	      nuc[3]=nuc[3]+1;;
+	      nucCtr++;
+	      break;
+
+	    case 'c' :
+	      nuc[3]=nuc[3]+1;
+	      nucCtr++;
+	      break;
+		      
+		  
+	    }
+
+	}
+       
+
+      
+
+
+
+      
+	//sort the nuc vector but retain the index of the sorted vector
+      vector<size_t> idx(nuc.size());
+      iota(idx.begin(), idx.end(), 0);
+
+      // sort indexes based on comparing values in v
+      sort(idx.begin(), idx.end(),
+	   [&nuc](size_t i1, size_t i2) {return nuc[i1] < nuc[i2];});
+
+
+      /*
+      for(int z=0; z<nuc.size(); z++)
+	{
+	  cout<<nuc[z]<<endl;
+	}
+
+      cout<<"end of nuc count \n"<<endl;
+
+      for(int z=0; z<idx.size(); z++)
+	{
+	  cout<<idx[z]<<endl;
+	}	
+
+      cout<<"end if index count \n\n\n\n";
+      */
+
+
+
+      //check to make sure the second highest nucleotide in the column is greater than the min necassary to make a cluster
+      //if so run through the column and seperate rows into the first and second highest matching nucleotides then try and assemble contigs based on the two seperate 
+      //groupings
+      if(nuc[idx[idx.size()-1]]>(cutoffMinNuc))
+	{
+
+	  double Nctr, nucCtr, badColCtr, longestDistN, percentNs, percentBadCol;
+
+	  std::vector<int> rowsCluster1, rowsCluster2;
+	  bool goodContig;
+
+	  for(k=0; k<sizeReadsToUse; k++)
+	    {
+	      j=rowsToAssemble[k]; //j is row index to use in assembly
+  
+	      if(alignmentMatrix[j][positionsN[indexSmallestDist]+startContig]==allNucs[idx[idx.size()-1]])
+		{
+		  rowsCluster1.push_back(j);
+		}
+
+	      if(alignmentMatrix[j][positionsN[indexSmallestDist]+startContig]==allNucs[idx[idx.size()-2]])
+		{
+		  rowsCluster2.push_back(j);
+		}
+
+	    }  
+
+	      string contig1=assembleContig(alignmentMatrix, rowsCluster1, nucCtr, badColCtr, cutoffMinNuc, Nctr, startContig, longestDistN);
+  
+	       goodContig=checkContig(contig1, readSize, badColCtr, Nctr, percentBadCol, percentNs);
+
+
+      
+	       if(goodContig==true)
+		 {
+		   contigs.push_back(contig1);
+		   
+		 }
+       
+	       if(nuc[idx[idx.size()-2]]>(cutoffMinNuc))
+		 {
+	       
+		   string contig2=assembleContig(alignmentMatrix, rowsCluster2, nucCtr, badColCtr, cutoffMinNuc, Nctr, startContig, longestDistN);
+	       
+		   checkContig(contig2, readSize, badColCtr, Nctr, percentBadCol, percentNs);
+	       
+
+      
+		   if(goodContig==true)
+		     {
+		       contigs.push_back(contig2);
+		   
+		     }
+		 }
+
+
+	    
+
+	}
+	  /*
+		  if(flag==false)
+		    {
+
+		      contigs.push_back(combinedNuc);
+		      contigs.push_back(combinedNuc);
+		  //co
+		  //cout<<"N position is "<<newContigs[newContigs.size()-1][positionsN[i]]<<endl;
+		      
+		      flag=true;
+		    }
+
+		  
+		  if(flag==true)
+		    {
+		      contigs[contigs.size()-1][positionsN[i]]=allNucs[idx[idx.size()-1]];
+		      contigs[contigs.size()-2][positionsN[i]]=allNucs[idx[idx.size()-2]];
+
+		      //		      cerr<<"replacing it with "<<allNucs[idx[idx.size()-1]]<<" "<<allNucs[idx[idx.size()-2]]<<endl;
+		    }
+	  */
+
+      
+  
+    
+
+
+}
+
 
 
 
@@ -814,14 +1251,15 @@ uint_fast64_t ReadCluster::numberDiff(vector<vector<char>> &alignmentMatrix, int
 
 
 
-string ReadCluster::assembleContig(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, double &nucCtr, double &badColCtr, int cutoffMinNuc, double &Nctr, double &startContig)
+string ReadCluster::assembleContig(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, double &nucCtr, double &badColCtr, int cutoffMinNuc, double &Nctr, double &startContig, double &longestDistN)
 {
   
   bool flag;
   int numCol, i, j, k, sizeReadsToUse, indexMax, posN;
   vector<int> nuc(4, 0); //A T G C
-  string combinedNuc;
+  string combinedNuc="";
   string allNucs="ATGC";
+  int Ndistance=0;
 
   string validChar = "ACGTacgt";
   
@@ -833,6 +1271,20 @@ string ReadCluster::assembleContig(std::vector<std::vector<char>> &alignmentMatr
 
   numCol=alignmentMatrix[0].size(); //all rows are the same size
   sizeReadsToUse=rowsToAssemble.size();
+
+
+  spp::sparse_hash_map<uint_fast64_t, double> mismatchedCount;
+
+  spp::sparse_hash_map<uint_fast64_t, double> nucleotideCtr; //two hash tables to keep track fo which rows consitently mismatch the consensus
+  // if a row mismatches the consensus at a N then you start counting 
+  //the number of mismatches to the consesus for that row this count is stored in mismatchedCount the total nubmer of nucleotides 
+  //for that row is stored in nucleotideCtr if the number of mismatches every gets higher than 25% of the total number of nucleotides
+  //than start ignoring that row in assembly 
+
+ 
+  
+  double cleanDistance=0;
+  double maxCleanDistance=0;
 
   int currentRow=0; //index into the current rows to assemble vector
 
@@ -850,18 +1302,21 @@ string ReadCluster::assembleContig(std::vector<std::vector<char>> &alignmentMatr
       for(k=0; k<sizeReadsToUse; k++)
 	{
 	  j=rowsToAssemble[k]; //j is row index to use in assembly
-
-	  //cerr<<"row is "<<j<<endl;
-	  /*
-	  if (validChar.find(alignmentMatrix[j][i]) == std::string::npos) { 
-	    continue;
-	  }else
-	    {
-	      cout<<"nuc is "<<alignmentMatrix[j][i]<<endl;
-	    }
-	  */
-
 	   
+	  
+	  if(nucleotideCtr.size()>0)
+	    {
+	  //if the row has to many mismatches relative to the consensus than do not consider this read any longer
+	      if(nucleotideCtr.count(j)>0)
+		{
+		  if(nucleotideCtr[j]==-1)
+		    {
+		      continue;
+		    }
+		}
+	    }
+
+
 	  switch(alignmentMatrix[j][i])
 		    {
 		    case 'A' :
@@ -909,6 +1364,8 @@ string ReadCluster::assembleContig(std::vector<std::vector<char>> &alignmentMatr
 		    }
 
 
+	  
+
 	}
 
       
@@ -918,13 +1375,68 @@ string ReadCluster::assembleContig(std::vector<std::vector<char>> &alignmentMatr
 
       indexMax=-1;
       indexMax=distance(nuc.begin(), std::max_element(nuc.begin(), nuc.end()));
+       
+      
+      
+      if(Nctr>0)
+	{
+
+	  //check to see if those rows which are suspect are mismatching the consensus
+	  for(auto iter=nucleotideCtr.begin(); iter!=nucleotideCtr.end(); iter++)
+	    {
+	      //if read has already been considered bad than do not consider it again just move on
+	      if(iter->second==-1)
+		{
+		  continue;
+		}
+
+
+	      if(alignmentMatrix[iter->first][i]!=allNucs[indexMax] && alignmentMatrix[iter->first][i]!='N')
+		{
+		  mismatchedCount[iter->first]=mismatchedCount[iter->first]+1;
+		  nucleotideCtr[iter->first]=nucleotideCtr[iter->first]+1;
+	
+		  
+		  //if the suspect rows ever get a mismatch relative to the consensus of greater than 25% than do not use those rows in the future
+		  if((nucleotideCtr[iter->first]>5) &&  ((mismatchedCount[iter->first]/nucleotideCtr[iter->first]) > 0.25) )
+		    {
+		      
+		      iter->second=-1;
+		      
+		    }
+		  
+		}
+
+	    }
+      
+
+	 
+	      
+	 
+	}
+
 
       
-      if(nuc[indexMax] >= cutoffMinNuc && ((nuc[indexMax]/nucCtr) > 0.75)) //filtering clusters
+
+      if(nuc[indexMax] >= cutoffMinNuc && ((nuc[indexMax]/nucCtr) >= 0.75)) //filtering clusters
 	{
+	  if(flag==false)
+	    {
+	      startContig=i;
+	    }
+
 	  flag=true;	  
-	  //cout<<nuc[indexMax]<<endl;
+	  //cout<<nuc[indexMax]<<endl;	  
+
 	  combinedNuc+=allNucs[indexMax];
+
+	  cleanDistance++;
+
+	  //keeping track of how many bases in a row in the contig are called cleanly 
+	  if(cleanDistance>maxCleanDistance)
+	    {
+	      maxCleanDistance=cleanDistance;
+	    }
 
 	}else
 	{
@@ -932,12 +1444,63 @@ string ReadCluster::assembleContig(std::vector<std::vector<char>> &alignmentMatr
 	  //if have already started the contig but not confident in next base call then place an N. 
 	  if(flag)
 	    {
-	      combinedNuc += 'N';
-	      Nctr++;
+	      //if you have a long column of nucleotides that don't agree than increment the N counter 
+	      if(nucCtr>=cutoffMinNuc)
+		{
+	      
+		  Nctr++;
+		  		  
+		  cleanDistance=0;
+		  
+
+		  //check to see which rows mismatched the consensus if they consistentally mismatch the consensus ignore those rows in the future
+		  for(k=0; k<sizeReadsToUse; k++)
+		    {
+		      j=rowsToAssemble[k]; //j is row index to use in assembly
+	   
+		      //if a read has already been considered and discarded than move on 
+		      if(nucleotideCtr.count(j)>0)
+			{
+			  if(nucleotideCtr[j]==-1)
+			    {
+			      continue;
+			    }
+			}
+
+		      //does not match the consesus
+		      if(alignmentMatrix[j][i]!=allNucs[indexMax] && alignmentMatrix[j][i]!='N')
+			{
+			  mismatchedCount[j]=1;
+			  nucleotideCtr[j]=1;
+			    
+			}
+
+		    }
+		  
+
+
+		}
+
+
+	     
+	      //cout<<"combinedNuc is "<<combinedNuc<<endl;
+	      combinedNuc+='N';
+		 
 	    }
 
 	}
 
+
+      
+
+      /*
+      //debugging code REMEMBER to comment out!!
+      if(flag==false)
+	{
+	  combinedNuc+='N';
+	}
+      
+      */
  
 
 /*
@@ -961,15 +1524,19 @@ string ReadCluster::assembleContig(std::vector<std::vector<char>> &alignmentMatr
     }
   
   
+  /*uncomment when running the code for real 
+   */
+
 
   posN=combinedNuc.find_last_not_of( 'N' ) +1;
   
-  Nctr=Nctr-(combinedNuc.length()-posN);
+  // Nctr=Nctr-(combinedNuc.length()-posN);
 
 
 //remove trailing Ns
   combinedNuc.erase( posN ); 
-
+  
+  longestDistN=maxCleanDistance;
 
   return(combinedNuc);
 
@@ -1202,7 +1769,7 @@ uint_fast64_t ReadCluster::getKmers()
 
   kmerPositions.clear();
   kmerInReadCounts.clear();
-
+  presentMultipleTimes.clear();
 
   string validChar = "ACGTacgtN";
   string DNAchar="ACGTacgt";
@@ -1255,6 +1822,11 @@ uint_fast64_t ReadCluster::getKmers()
   kmer=0;
   positionCtr=0;
 
+  
+  //than is not an appropriate kmer to use in assembly 
+  //presentMultipleTimes.set_empty_key(false);
+
+
   //iterator through ever read in the cluster getting a list of the kmers 
   for(j=0; j<readSeqs.size(); j++)  
   {
@@ -1272,12 +1844,14 @@ uint_fast64_t ReadCluster::getKmers()
     dense_hash_map<uint_fast64_t, long, customHash> readKmers; //hash table contains the kmers and their position in the read 
     readKmers.set_empty_key(-20);
 
-    dense_hash_map<uint_fast64_t, long, customHash> alreadyPresent; //hash table keeps track of kmers that have already been found earlier in the read key is the kmer the value is a flag set to 1 indicating the 
+    //dense_hash_map<uint_fast64_t, long, customHash> alreadyPresent; //hash table keeps track of kmers that have already been found earlier in the read key is the kmer the value is a flag set to 1 indicating the 
     //kmer is present in the read
-    alreadyPresent.set_empty_key(-20);
+    //alreadyPresent.set_empty_key(-20);
 
 
     //     std::vector< google::dense_hash_map<uint_fast64_t, long, customHash> > kmerPositions;
+
+   
 
     kmer=0;
     positionCtr=0;
@@ -1364,23 +1938,33 @@ uint_fast64_t ReadCluster::getKmers()
 	      }
 	      */
 	      
-	      readKmers[kmer]=i;
-	 
+
+	      //lookup key if key not found will return iterator that points to end of hash table
+	      auto iter=readKmers.find(kmer);
+	      
+	      if(iter!=readKmers.end())
+		{
+		  presentMultipleTimes[kmer]=true;
+
+		}
+
+	      
+	      if(iter==readKmers.end()) //means kmer is not present earlier in the read this is important because only want to count a kmer once per read
+		{
+		  kmerInReadCounts[kmer]=kmerInReadCounts[kmer]+1;		  
+		  readKmers[kmer]=i;	 
+		  
+		  //alreadyPresent[kmer]=1; //setting value to 1 indicating kmer has been found in this read
+		}
+
+
+
+	      
 	      //continue;
 	     
 	      
      
-	      //lookup key if key not found will return iterator that points to end of hash table
-	      auto iter=alreadyPresent.find(kmer);
-	      
-	      
-	      if(iter==alreadyPresent.end()) //means kmer is not present earlier in the read this is important because only want to count a kmer once per read
-		{
-		  kmerInReadCounts[kmer]=kmerInReadCounts[kmer]+1;
-		 
-		  alreadyPresent[kmer]=1; //setting value to 1 indicating kmer has been found in this read
-		}
-
+	   
 	      
 	}
 
@@ -1401,8 +1985,22 @@ uint_fast64_t ReadCluster::getKmers()
   auto iterHash=kmerInReadCounts.begin();
   for(iterHash; iterHash!=kmerInReadCounts.end(); iterHash++)
     {
+
       if(iterHash->second > max)
 	{
+
+	  
+	  
+	   //checking to see if a potential max kmer is present multiple times in at least one read if it is then do not use that kmer as the max kmer
+	  if(presentMultipleTimes.count(iterHash->first)>0)
+	    {
+	      //cerr<<"read "<<j<<" "<<maxKmer<<endl;
+	      
+	      continue;
+	    }
+	  
+	  
+
 	  maxKmer=iterHash->first;
 	  max=iterHash->second;
 	}

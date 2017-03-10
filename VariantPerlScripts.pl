@@ -65,11 +65,11 @@ my $flag=shift;
 
 #exit;
 
-#my $genome="/data/Genomes/human19/allChrhg19InOrder.fa";
+my $genome="/data/Genomes/human19/allChrhg19InOrder.fa";
 
 #my $genome="/data6/sukrit/081216_MiSeq_MMB1newdel_genomeSeq/MappingToReference/MMB1genomeCIRC84.fasta";
 
-my $genome="/data/Genomes/cElegans10/allChr.fa";
+#my $genome="/data/Genomes/cElegans10/allChr.fa";
 
 
 
