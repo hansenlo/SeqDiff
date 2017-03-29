@@ -10,7 +10,7 @@
 //#include<boost/dynamic_bitset.hpp>
 //#include<algorithm>
 //#include <boost/algorithm/string.hpp>
-//#include<math.h>
+#include<math.h>
 #include<stdint.h>
 //#include <stddef.h>
 //#include<stdio.h>
@@ -24,6 +24,7 @@
 #include <functional>
 #include <tuple>
 #include<sstream>
+#include<numeric>
 
 #include "utilities.h"
 
@@ -106,7 +107,10 @@ public:
   //also returned is the positions of the Ns in the contig
   //startContig contains the starting column in the alignmentMatrix of where the contig is starting to be assembled
   //longestDistN contains the longest distance between Ns for the contig
-  std::string assembleContig(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, double &nucCtr, double &badColCtr, int cutoffMinNuc, double &Nctr, double &startContig, double &longestDistN);
+  //subClusterCtr contains a count of how many columns have a high second highest nuclotide count 
+  //problematicCols is a list of columns which have a large number of counts for the second highest nucleotide
+  std::string assembleContig(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, double &nucCtr, double &badColCtr, int cutoffMinNuc, double &Nctr, double &startContig, double &longestDistN,
+			     int &subClusterCtr, std::vector<int> &problematicCols);
   
   //std::vector<double> &Npositions
 
@@ -124,6 +128,8 @@ public:
 
   //trys to split a contig into two different contigs representing two different variants 
   bool extractVariants(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, std::vector<std::string> &newContigs, double &startContig, int cutoffMinNuc, int readSize);
+ 
+  bool assembleSubClusters(std::vector<std::vector<char>> &alignmentMatrix, std::vector<int> &rowsToAssemble, std::string &combinedNuc, std::vector<std::string> &newContigs, double &startContig, int cutoffMinNuc, int readSize, std::vector<int> &problematicCols);
  
 
 

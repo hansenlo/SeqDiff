@@ -151,7 +151,9 @@ int main(int argc, char *argv[] )
 
       cerr<<"Starting to read in genome \n";
 					  
-      readInFasta(genome, "/data/Genomes/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
+      //readInFasta(genome, "/data/Genomes/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
+
+      readInFasta(genome, "/data/Genomes/entireHuman19Broad/hs37d5_chrAdded.fa"); //function to read in a multi fasta file and store it in a hash table
 
   //cerr<<"starting to call indels"<<endl;
 
@@ -523,8 +525,8 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
 
 
-
-
+  //my vcf output
+  
 
   snpOut<<"##fileformat=VCFv4.2\n";
   snpOut<<"##reference=hg19\n";
@@ -544,6 +546,24 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
   indelOut<< "##FORMAT=<ID=GT,Number=1,Type=Integer,Description=\"Genotype\">\n";
   indelOut<< "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNA12878\n";
  
+  
+
+
+  //vcf output for justin GIB
+
+  /*
+  snpOut<<"##fileformat=VCFv4.2\n";
+  snpOut<<"##reference=hg19\n";
+  snpOut<<"##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
+  snpOut<<"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n";
+
+
+  indelOut<< "##fileformat=VCFv4.2\n";
+  indelOut<< "##reference=hg19\n";
+  indelOut<< "##INFO=<ID=Length,Number=1,Type=Integer,Description=\"The length of the indel\">\n";
+  indelOut<< "##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
+  indelOut<< "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n";
+  */
 
 
 
@@ -555,6 +575,8 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
   int i, k;
   string info, printIndel, printDel; 
   double sizeHardClipped, sizeSoftClipped;
+  long mappingQuality;
+  
 
   for(i=0; i<alignments.size(); i++)
     {
@@ -570,6 +592,9 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 	}
 
       cigar=alignments[i][5];
+
+
+      mappingQuality=stoull(alignments[i][4], NULL, 10);
 
       //iterate through cigar string handling the various operations 
       int j;
@@ -628,6 +653,8 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 		}else if(cigar[j]=='M' || cigar[j]=='X' || cigar[j]=='=')
 		{
 
+		  //cerr<<"chr is "<<chr<<endl;
+
 
 		  refAlign+=genome[chr].substr(refPos, sizeOperation);
 		  readAlign+=readSeq.substr(readPos, sizeOperation);
@@ -680,13 +707,14 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 	  cerr<<"Aligner may be using other cigar operations "<<endl;
 	}
 
-      /*
+      
+      
       //if hard or soft clipping is greater than 30% of the contig than do not use that contig for indel calling
-      if(((sizeSoftClipped/readAlign.size())>0.3) || ((sizeHardClipped/readAlign.size())>0.3) )
+      if( (((sizeSoftClipped/readAlign.size())>0.3) || ((sizeHardClipped/readAlign.size())>0.3)) && mappingQuality<30)
 	{
 	  continue;
 	}
-      */
+      
 
 
       
@@ -707,7 +735,11 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
       //sizeInto=0;
 
+      int Nctr=0;
 
+      int slidingWindowSize=10;
+      int slidingWindowCtr=0;
+      int Ncutoff=1; //if more than Ncutoff bases in the last slidingWindowSize are greater than Ncutoff than don't call that variant
 
       //running through the alignment calling the snps and indels
       for(int k=0; k<(readAlign.size()-sizeInto); k++)
@@ -718,7 +750,31 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
 	  if(refAlign[k]!='-')
 	    {
+
+	      /* not finished!!
+	      //keeping track of how many bases in the last slidingWindowSize bases are Ns
+	      if(slidingWindowCtr==slidingWindowSize)
+		{
+		  slidingWindowCtr=9;
+
+		  if(refAlign[k-slidingWindowSize]=='N')
+		    {
+		      Nctr--;
+		    }
+		  
+		  NCtr=0;
+
+		}
+	     
+		 slidingWindowCtr++;
+ */
+
+
 	      refPos++;
+
+	     
+	      
+
 	    }
 
 
@@ -734,6 +790,8 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 	    {
 	      continue;
 	    }
+	  
+
 	  
 
 	  //if have an insertion immediately followed by a deletion or vice versa then  need to keep track of last reference base
@@ -790,13 +848,42 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 		  if(insertion==true)
 		    {
 		      //subtract 1 from alt size because alt sequence includes the base before the insertion
+		      Nctr=0;
+		      //check five bases before and after variant call if have to many Ns in that window than don't call the variant
+		      for(j=k-5; j<k; j++)
+			{
+			  if((readAlign[j]=='N'))
+			    {
+			      Nctr++;
+			    }
+			    
+			}
+		      
+		      for(j=k; j<k+5; j++)
+			{
+			  if((readAlign[j]=='N'))
+			    {
+			      Nctr++;
+			    }
+			    
+			}
+		      
+
+		    
+
+
 
 		      posIns=refPos-1;
 
 		      info=alignments[i][0]+";Length="+std::to_string(alt.size()-1)+";Type=INS;AlleleFraction=.";
 		      printIndel=alignments[i][2]+"\t"+std::to_string(posIns)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
 
-		      indelOut<<printIndel<<endl;
+		        if(Nctr<Ncutoff)
+			{
+			 
+			  indelOut<<printIndel<<endl;
+
+			}
 
 		      insertion=false;
 		      ref="";
@@ -845,13 +932,43 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 		    {
 
 
+		      //subtract 1 from alt size because alt sequence includes the base before the insertion
+		      Nctr=0;
+		      //check five bases before and after variant call if have to many Ns in that window than don't call the variant
+		      for(j=k-5; j<k; j++)
+			{
+			  if((readAlign[j]=='N'))
+			    {
+			      Nctr++;
+			    }
+			    
+			}
+		      
+		      for(j=k; j<k+5; j++)
+			{
+			  if((readAlign[j]=='N'))
+			    {
+			      Nctr++;
+			    }
+			    
+			}
+		      
+
+		     
+
+
 		      //subtract 1 from reference size because ref sequence includes the base before the deletion
 		      posDel=refPos-(ref.size());
 
 		      info=alignments[i][0]+";Length="+std::to_string(ref.size()-1)+";Type=DEL;AlleleFraction=.";
 		      printIndel=alignments[i][2]+"\t"+std::to_string(posDel)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
 
-		      indelOut<<printIndel<<endl;
+		      if(Nctr<Ncutoff)
+			{
+			
+			  indelOut<<printIndel<<endl;
+			}
+
 
 		      deletion=false;
 		      ref="";
@@ -876,10 +993,38 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 	      if(toupper(readAlign[k])!=toupper(refAlign[k]) && readAlign[k]!='N')
 		{
 		      
+		     //subtract 1 from alt size because alt sequence includes the base before the insertion
+		      Nctr=0;
+		      //check five bases before and after variant call if have to many Ns in that window than don't call the variant
+		      for(j=k-5; j<k; j++)
+			{
+			  if((readAlign[j]=='N'))
+			    {
+			      Nctr++;
+			    }
+			    
+			}
+		      
+		      for(j=k; j<k+5; j++)
+			{
+			  if((readAlign[j]=='N'))
+			    {
+			      Nctr++;
+			    }
+			    
+			}	      
+
+		 
 
 		  info=alignments[i][0]+";Type=SNP;AlleleFraction=.";
 		  string printSnp=alignments[i][2]+"\t"+std::to_string(refPos)+"\t"+"."+"\t"+string(1, toupper(refAlign[k]))+"\t"+string(1, toupper(readAlign[k]))+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
-		  snpOut<<printSnp<<endl;
+	
+		   if(Nctr<Ncutoff)
+			{
+		
+			  snpOut<<printSnp<<endl;
+		
+			}
 		}
 		
 		  
@@ -901,14 +1046,43 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 		    }
 
 		  */
+		     //subtract 1 from alt size because alt sequence includes the base before the insertion
+		      Nctr=0;
+		      //check five bases before and after variant call if have to many Ns in that window than don't call the variant
+		      for(j=k-5; j<k; j++)
+			{
+			  if((readAlign[j]=='N'))
+			    {
+			      Nctr++;
+			    }
+			    
+			}
+		      
+		      for(j=k; j<k+5; j++)
+			{
+			  if((readAlign[j]=='N'))
+			    {
+			      Nctr++;
+			    }
+			    
+			}
+		      
+
+		     
+
+
+
 
 		  posIns=refPos-1;
 
 		  info=alignments[i][0]+";Length="+std::to_string(alt.size()-1)+";Type=INS;AlleleFraction=.";
 		  printIndel=alignments[i][2]+"\t"+std::to_string(posIns)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
 
-		  indelOut<<printIndel<<endl;
-
+		  if(Nctr<Ncutoff)
+		    {
+		
+		      indelOut<<printIndel<<endl;
+		    }
 		  insertion=false;
 		  ref="";
 		  alt="";
@@ -918,6 +1092,33 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 		  //printing out the deletion
 	      if(deletion==true)
 		{
+
+
+		     //subtract 1 from alt size because alt sequence includes the base before the insertion
+		      Nctr=0;
+		      //check five bases before and after variant call if have to many Ns in that window than don't call the variant
+		      for(j=k-5; j<k; j++)
+			{
+			  if((readAlign[j]=='N'))
+			    {
+			      Nctr++;
+			    }
+			    
+			}
+		      
+		      for(j=k; j<k+5; j++)
+			{
+			  if((readAlign[j]=='N'))
+			    {
+			      Nctr++;
+			    }
+			    
+			}
+		      
+
+		    
+
+
 
 		  /*
 		  if(alignments[i][0]=="141210_68")
@@ -937,8 +1138,11 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 		  info=alignments[i][0]+";Length="+std::to_string(ref.size()-1)+";Type=DEL;AlleleFraction=.";
 		  printIndel=alignments[i][2]+"\t"+std::to_string(posDel)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
 		  
-		  indelOut<<printIndel<<endl;
-
+		  if(Nctr<Ncutoff)
+		    {
+		
+		      indelOut<<printIndel<<endl;
+		    }
 		  deletion=false;
 		  ref="";
 		  alt="";

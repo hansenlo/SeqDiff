@@ -42,7 +42,7 @@ print "$splitLine[$#splitLine]\n";
 
 $splitLine[$#splitLine]=~m/(.*).fastq$/;
 
-$header="unique_".$1."_test";
+$header="unique_".$1."_55K";
 
 $dataset=$1;
 
@@ -64,7 +64,10 @@ $path=$1."/";
 
 #$blastDB="/data/Bowtie2Index/hg19GATK";
 
-$blastDB="/data/BwaIndex/allChrhg19InOrder.fa";
+#$blastDB="/data/BwaIndex/allChrhg19InOrder.fa";
+$blastDB="/data/BwaIndex/hs37d5_chrAdded.fa";
+
+
 #$blastDB="/data/BwaIndex/allChr_cElegans10.fa";
 #$blastDB="/data6/sukrit/081216_MiSeq_MMB1newdel_genomeSeq/MappingToReference/MMB1genomeCIRC84.fasta";
 
@@ -105,9 +108,9 @@ if(1==1)
 
 #$cmd="time ./findDiff_BitString_HashTableVer $controlFile $file  31 0 $cutoff temp.dat > "."/home/hansenlo/SeqDiff/Results/".$outputUnique;
 
-$cmd="time ./variantFinder $expKmerCounts $expFastq 45 > temp.dat";
+#$cmd="time ./variantFinder $expKmerCounts $expFastq 45 > temp.dat";
 
-#$cmd="time ./variantFinder $expKmerCounts $expFastq 55 > temp.dat";
+$cmd="time ./variantFinder $expKmerCounts $expFastq 55 > temp.dat";
 
 
 #$cmd="time /home/hansenlo/LamiaSeqDiff/SeqDiff/variantFinder $expKmerCounts $expFastq 45 > temp.dat";
@@ -135,6 +138,10 @@ system($cmd)==0
 
 }
 
+
+#exit();
+
+my $uniqueReadsLocation="/data5/SeqDiffResults/Results/".$header."_unique.fastq";
 
 #copying sequence to appropriate places
 if(1==1)
@@ -309,8 +316,6 @@ system($cmd)==0
 
 
 
-
-
 ######################Aligning the contigs#####################
 #$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."refGenomeOnly_contigEdges.sam";
 
@@ -451,6 +456,9 @@ system($cmd)==0
 
 }
 
+####remember to remove!!
+#exit();
+
 #extending contig edges
 if(1==1)
 {
@@ -476,7 +484,7 @@ print "Starting iterative alignment\n";
 #&iterativeAlignment("/data5/SeqDiffResults/Results/unique_allPlatinum_contigs.fasta", 20, 80,  $blastDB, $header);
 
 my $mappingQualityCutoff=35;
-&iterativeAlignment("clippedContigs.fa", 20, 80,  $blastDB, $header, $mappingQualityCutoff);
+&iterativeAlignment("clippedContigs.fa", 30, 250,  $blastDB, $header, $mappingQualityCutoff);
 
 #&iterativeAlignment($contigs, 20, 180,  $blastDB, $header, $mappingQualityCutoff);
 
@@ -492,7 +500,9 @@ print "Starting to extend alignments\n";
 
 #&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", "/data5/SeqDiffResults/Results/unique_allPlatinum_contigs.fasta");
 
-&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/human19/allChrhg19InOrder.fa", $contigs);
+
+
+&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/entireHuman19Broad/hs37d5_chrAdded.fa", $contigs);
 
 #&extendAlignments("mappedReads_IDs.dat", 2, "/data/Genomes/cElegans10/allChr.fa", $contigs);
 
@@ -531,7 +541,7 @@ $alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header.".sam";
 
 #$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data/uniqueReads.fastq --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
 
-$cmd="time /data/bin/bwa-master/bwa mem -t 20 $blastDB"." /data/uniqueReads.fastq > $alignmentOutput";
+$cmd="time /data/bin/bwa-master/bwa mem -t 35 $blastDB"." $uniqueReadsLocation > $alignmentOutput";
 
 
 #fasta command DONT FORGET

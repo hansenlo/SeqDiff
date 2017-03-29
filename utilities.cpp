@@ -446,10 +446,22 @@ void readInFasta(std::unordered_map<std::string, std::string> &genome, string fi
       
 	  if(line[0]=='>')
 	    {
+
+
 	      chr=line.substr(1); 
+
+	      cerr<<"chr is "<<chr<<endl;
+
+	      if(chr=="GL000220.1")
+		{
+		  string temp="1";
+		}
+
 	      genome[chr]="";
 	    }else
 	    {
+	      
+	      
 	      genome[chr]=genome[chr].append(line);
 
 	    }

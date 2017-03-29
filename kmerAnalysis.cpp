@@ -1230,9 +1230,12 @@ void filterClusters(std::unordered_map<double, double > &linkClusters, //hash ta
 	
 		  if(linkClusters.count(currentIndex)>0)
 		    {
+		      currentIndex=linkClusters[previousIndex];
+		      
 		      //test[previousIndex]=-1;
 		      linkClusters[previousIndex]=-1;
-		      currentIndex=linkClusters[currentIndex];
+
+		      //
 		    }else
 		    {
 		      endChain=true;
@@ -2008,10 +2011,11 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		  uniqueReadsBuffer.push_back(to_string(maxCount)); //store the max unique word count
 		  
       
-		  //break;
+		  // break;
 		}
 	      
 		 
+	      
 	      //if have already examined every possible novel word associated with a variant on the read then reset and start looking at the rest of the read for variants
 	      if(distanceFirstKey>=kmerSize)
 		{
@@ -2022,7 +2026,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 		  firstKey.reset();
 		  maxCount=0;
 		}
-	      	      
+	          
 		  
 
 		}
@@ -2185,7 +2189,8 @@ vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  
       files.push_back(make_shared<ofstream>(line, std::ios::out ));
    }
   
-  
+  //return(fileNames);
+
    std::unordered_map<double, double > linkClusters;
    string uniqueReadFile="/data/uniqueReads.fastq";
 
@@ -2235,7 +2240,7 @@ vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  
 
   clusterFile.close();
 
-  return(fileNames);
+ 
    */
   //end of debugging Code
 
@@ -2350,7 +2355,7 @@ vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  
    
 
   loadedFileFlag=0;
-  thread_count=35;
+  thread_count=25;
   lineCtr=1;
   chunkCtr=0;
   maxChunksWork=10;
@@ -2609,7 +2614,7 @@ vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  
   uniqueOut.close();
 
 
-  /*
+  
        
   ofstream debuggingLinkingBefore("debuggingLinkingBeforeFiltering.dat");
 
@@ -2634,10 +2639,10 @@ vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  
    debuggingLinkingBefore.close();
   
   
-  */
+  
 
 
-  int maxConnectivity=10;
+  int maxConnectivity=2;
   //filtering out bad clusters
   filterClusters(linkClusters, maxConnectivity);
 
@@ -2651,7 +2656,7 @@ vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  
   //dense_hash_map<uint_fast64_t, long, customHash> clusterKmers; //hash table key is kmer value is the cluster that kmer belongs to
 
 
-  /*
+  
   
   ofstream debuggingLinking("debuggingLinking.dat");
 
@@ -2673,7 +2678,7 @@ vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  
      }
   
    debuggingLinking.close();
-  */
+  
   
    
 
@@ -2822,8 +2827,8 @@ void sendClustersToFile(string &uniqueReadFile, google::dense_hash_map<uint_fast
 		  qualityStringBuffer.push_back(qualityString);
 		}
 	
-	      if(currentIndex==-1)
-		{
+	       if(currentIndex==-1)
+	      {
 
 		  /*
 
@@ -2843,12 +2848,12 @@ void sendClustersToFile(string &uniqueReadFile, google::dense_hash_map<uint_fast
 		  */
 
 
-		  clusterBuffer.push_back(vector<string>{readSeq, to_string(clusterIndex), tokenizedString[3]} );
-		  qualityBuffer.push_back(stoull(tokenizedString[2]));
-		  qualityStringBuffer.push_back(qualityString);
+	        clusterBuffer.push_back(vector<string>{readSeq, to_string(clusterIndex), tokenizedString[3]} );
+	        qualityBuffer.push_back(stoull(tokenizedString[2]));
+	        qualityStringBuffer.push_back(qualityString);
 
 
-		}
+	      }
 
 	      tokenizedString.clear();
 
@@ -2982,6 +2987,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	  maxCount=stoull(stringMaxCount, NULL, 10);
 
 
+
       //check to see if cluster already exists in hash table
       //if cluster exists then add read to existing cluster
       //otherwise add an entry into hash table
@@ -3065,6 +3071,15 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
 	  maxCount=maxCounts[iter->first]; //getting the max unique word count for this cluster
 	 
+	 
+
+	  //ignore clusters that have a unique word that has greater than 500 count
+	  if(maxCount>500)
+	    {
+	      continue;
+	    }
+
+
 
 	  //deduplicating reads
 	  //sort( iter->second->begin(), iter->second->end() );

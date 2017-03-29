@@ -236,13 +236,13 @@ int main(int argc, char *argv[] )
     ofstream contigOut("/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/contigs.fa"); //location of where to put file containing contigs
     long clusterID=0;
 
-    ofstream debuggingMatrix("/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/debuggingMatrix.dat"); //location of where to put file containing the matrix of aligned reads used to assemble contigs
+    ofstream debuggingMatrix("/data3/debuggingMatrix.dat"); //location of where to put file containing the matrix of aligned reads used to assemble contigs
 
     
     /*
     vector<string> testAssembly;
 
-    testAssembly.push_back("/data2/Temp/0.dat");
+    testAssembly.push_back("/data/Temp/0.dat");
 
   //test is the file containing the reads in a contig
   //4 is the cutoff number of reads 
@@ -254,8 +254,8 @@ int main(int argc, char *argv[] )
   //assembleContigs();
 
   return(0);
+    
     */
-
 
 
 
