@@ -27,12 +27,13 @@ using std::unordered_map;
 int main(int argc, char *argv[] )
 {
 
+  /*
  if(argc!=4)
     {
       cerr<<"expecting five command line arguments exiting"<<endl;
       return(0);
     }
-
+  */
   
   int kmerSize, cutoff, readLength, timesRun;
   char continueFlag;
@@ -42,23 +43,28 @@ int main(int argc, char *argv[] )
   char start;
   bool fastq;
   vector<string> fileNames; //names of the files clusters are stored in
+  string outputDir;
 
-  //number of characters in kmer
-  kmerSize=atoi(argv[3]);
-  
-  //Number of variants allowed in the control 
-  //cutoff=atoi(argv[5]);
 
+ 
   //file that contains the counts of unique kmers in the experiment sequencing  library
   uniqueExpKmerCountFile=argv[1];
 
   //experiment sequencing library
   expSeqLib=argv[2];
 
+
+  //number of characters in kmer
+  kmerSize=atoi(argv[3]);
+
+   //count of number of kmers needed before calling a variant
+  cutoff=atoi(argv[4]);
+
+
   //name of outputFile that control kmers could be printed to
   //outputFile=argv[6];
 
-
+  outputDir=argv[5];
 
   //dense_hash_map<uint_fast64_t, ReadCluster *, customHash> allClusters;
 
@@ -67,7 +73,6 @@ int main(int argc, char *argv[] )
   
   dense_hash_map<uint_fast64_t, uint_fast64_t, customHash> masterKey; //hash table contains the first middle and end kmer of the master read that defines a cluster
   masterKey.set_empty_key(-20);
-
 
 
 
@@ -176,8 +181,11 @@ int main(int argc, char *argv[] )
 
   cerr<<"starting to read in unique kmers "<<endl;
 
+
   //8 is the kmer count cutoff
-  readUniqueKmers(uniqueKmers, continueFlag, uniqueExpKmerCountFile, kmerSize, 8); //Need to uncomment for code to work
+  uint_fast64_t averageUniqueKmerCount=readUniqueKmers(uniqueKmers, continueFlag, uniqueExpKmerCountFile, kmerSize, cutoff); //Need to uncomment for code to work
+
+  cerr<<"average number of times a novel kmer is present "<<averageUniqueKmerCount<<endl;
 
   
   //return(0);
@@ -211,7 +219,9 @@ int main(int argc, char *argv[] )
   cerr<<"finished getting control kmers"<<endl;
 
       //256 is number of files to split clusters into
-  fileNames=getReads(uniqueKmers, 256, continueFlag, expSeqLib, kmerSize); //NEED TO UNCOMMENT
+  fileNames=getReads(uniqueKmers, 256, continueFlag, expSeqLib, kmerSize, outputDir); //NEED TO UNCOMMENT
+
+
    
     uniqueKmers.clear(); //reallocating all the memory held by the hash table of unique kmers
 
@@ -233,9 +243,23 @@ int main(int argc, char *argv[] )
 
 
     
-    ofstream contigOut("/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/contigs.fa"); //location of where to put file containing contigs
-    long clusterID=0;
+	      //ofstream contigOut("/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/contigs.fa"); //location of where to put file containing contigs
+    
+    ofstream contigOut;
+    if(outputDir.back()=='/')
+      {
+	contigOut.open(outputDir+"contigs.fa"); //location of where to put file containing contigs
+      }else
+      {
+	contigOut.open(outputDir+"/contigs.fa"); //location of where to put file containing contigs
+      }
+    
+	      
 
+	      long clusterID=0;
+
+
+	      //debugging file
     ofstream debuggingMatrix("/data3/debuggingMatrix.dat"); //location of where to put file containing the matrix of aligned reads used to assemble contigs
 
     
@@ -284,10 +308,10 @@ int main(int argc, char *argv[] )
 	  //cerr<<"currentClusterFilePrivate index is "<<currentClusterFilePrivate<<endl;
 
 
-	//3 is the cutoff number of reads 
+	//4 is the cutoff number of reads 
 	//20 is the kmer size used to assemble the reads into a contig
 	
-	readInCluster(fileNames[currentClusterFilePrivate], 4, 25, tid, contigOut, clusterID, debuggingMatrix);
+	readInCluster(fileNames[currentClusterFilePrivate], 4, 25, tid, contigOut, clusterID, debuggingMatrix, averageUniqueKmerCount);
 
 	  // readInCluster(fileNames[1], 4, 20, tid);
 	 

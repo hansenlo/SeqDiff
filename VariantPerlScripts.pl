@@ -56,6 +56,7 @@ my $contigSeq=shift;
 
 my $flag=shift;
 
+my $genome=shift;
 #my  $avg=`samtools mpileup -ABr chr21:16442562-16442689 -d 1000000 /data3/GenomeInABottle/chr21_notAligned.sorted.bam |  awk \'{sum+=\$4} END { print sum/NR}\'`;
 
 #my $test=$avg/2;
@@ -65,7 +66,10 @@ my $flag=shift;
 
 #exit;
 
-my $genome="/data/Genomes/human19/allChrhg19InOrder.fa";
+#my $genome="/data/Genomes/human19/allChrhg19InOrder.fa";
+
+# $genome="/data/Genomes/entireHuman19Broad/hs37d5_chrAdded.fa";
+
 
 #my $genome="/data6/sukrit/081216_MiSeq_MMB1newdel_genomeSeq/MappingToReference/MMB1genomeCIRC84.fasta";
 
@@ -141,6 +145,12 @@ sub extractFasta($ $)
 	
 
 	$length=length($fastaSeq);
+
+	if($numNuc>$length)
+	{
+	    $numNuc=$length-1;
+	}
+
 
 	$mid=int($length/2);
 
@@ -2083,7 +2093,7 @@ sub filterContigsVer2($ $ $ $)
     %genome=&readFasta($genomeFile);
 
 
-if(1==1)
+if(1==2)
 {
     #header for vcf file
     print "##fileformat=VCFv4.1\n";
@@ -2095,6 +2105,22 @@ if(1==1)
     print "##INFO=<ID=SVLEN, Number=1, Type=Integer, Description=\"The size of the indel\">\n";
     print "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
 }
+
+
+
+#Justins GIB header
+if(1==1)
+{
+    #header for vcf file
+    print "##fileformat=VCFv4.1\n";
+    print "##INFO=<ID=Contig, Number=1, Type=String, Description=\"Contig id the variant was derived from\">\n";
+    print "##INFO=<ID=Ends, Number=2, Type=Integer, Description=\"The mapping quality of the two ends of the contig\">\n";
+    print "##INFO=<ID=SVLEN, Number=1, Type=Integer, Description=\"The length of the structural Variant\">\n";
+    print "##INFO=<ID=SVTYPE, Number=1, Type=String, Description=\"The structural variant type\">\n";
+    print "##INFO=<ID=END, Number=1, Type=String, Description=\"The end location of the variant\">\n";
+    print "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE\n";
+}
+
 
 
 
@@ -2168,6 +2194,11 @@ if(1==1)
 
 	$contigID=$1;
 	$size=$2;
+	
+	if($contigID=~m/5851255/)
+	{
+	    my $temp=1;
+	}
 
 #	$contigID=~m/^(\d+)\_/;
 
@@ -2231,7 +2262,7 @@ if(1==1)
 	    
 	    $diff=$regions[$secondIndex][2]-$regions[$index][1];
 
-	    if($contigID=~m/.*1175227.*/)
+	    if($contigID=~m/.*3967490.*/)
 	    {
 		my $temp=1;
 	    }
@@ -2423,17 +2454,36 @@ if(1==1)
 		    #$varSeq=".";
 		    #$referenceSeq=".";
 
+		    $start=$start-1;
 
-		    $varSeq=uc(substr($genome{$regions[$secondIndex][0]}, $start, 1) );
-		    $referenceSeq=uc(substr($genome{$regions[$secondIndex][0]}, $start, $dev));
+		    $varSeq=uc(substr($genome{$regions[$secondIndex][0]}, $start-1, 1) );
+		    $referenceSeq=uc(substr($genome{$regions[$secondIndex][0]}, $start-1, $dev));
 
 		    if($dev>1000000)
 		    {
 			next;
 		    }
 
+		    #making sure the reference sequence has only allowed bases
+#		    if($referenceSeq !~ m/A|C|G|T|a|c|g|t|N/)
+#		    {
+#			next;
+#		    }
 
-		    $printString="$regions[$secondIndex][0]\t$start\t"."."."\t$referenceSeq\t$varSeq\t"."."."\tPASS\tcontig=$contigID;Ends=$endQuality;Length=$dev;Type=deletion\tGT\t1|1";
+
+		    ##to filter SV variants that only occur on fasta records that hve chr in the title super dangerous be careful!!!
+		    if($regions[$secondIndex][0] !~ m/chr/)
+		    {
+		#	next;
+		    }
+
+
+		    my $delEnd=$start+$dev;
+
+		    #$printString="$regions[$secondIndex][0]\t$start\t"."."."\t$referenceSeq\t$varSeq\t"."."."\tPASS\tcontig=$contigID;Ends=$endQuality;Length=$dev;Type=deletion\tGT\t1|1";
+
+		    $printString="$regions[$secondIndex][0]\t$start\t"."."."\t$referenceSeq\t$varSeq\t"."."."\tPASS\tcontig=$contigID;SVLEN=$dev;SVTYPE=DEL;END=$delEnd\tGT\t".".";
+
 
 		    #print "$dev\n";
 
@@ -2466,9 +2516,9 @@ if(1==1)
 
 		    #print "$regions[$index][0]\t$start\t$end\n";
 
-		    $printString="$regions[$secondIndex][0]\t$start\t"."."."\t$varSeq\t$referenceSeq\t"."."."\tPASS\tcontig=$contigID;Ends=$end;Length=$dev;Type=insertion\tGT\t1|1";
+		   # $printString="$regions[$secondIndex][0]\t$start\t"."."."\t$varSeq\t$referenceSeq\t"."."."\tPASS\tcontig=$contigID;Ends=$end;Length=$dev;Type=insertion\tGT\t1|1";
 
-		    print "$printString\n";
+		    #print "$printString\n";
 
 		}
 		   

@@ -547,3 +547,12 @@ void revComplementMachineWord(uint_fast64_t &key, uint_fast64_t &revKey, int clu
   revKey=revKey>>(64-clusterKmerSize*2);
 
 }
+
+void find_and_replace(string& source, string const& find, string const& replace)
+{
+    for(string::size_type i = 0; (i = source.find(find, i)) != string::npos;)
+    {
+        source.replace(i, find.length(), replace);
+        i += replace.length();
+    }
+}

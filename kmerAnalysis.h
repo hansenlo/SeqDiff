@@ -16,7 +16,8 @@ inline void countKmers(google::sparse_hash_map<uint_fast64_t, int, customHash> &
 //void countUniqueKmers(std::vector <uint_fast64_t> &controlCtr1, std::vector <uint_fast64_t> &controlCtr2,   dense_hash_map<uint_fast64_t, int, customHash> &uniqueKmers,  char nextLineFlag, std::string inputFile, int kmerSize)
 void countUniqueKmers(google::sparse_hash_map<uint_fast64_t, int, customHash>  &controlKmers, google::sparse_hash_map<uint_fast64_t, int, customHash>  &uniqueKmers,  char nextLineFlag, std::string inputFile, int kmerSize);
 
-void readUniqueKmers(spp::sparse_hash_map<std::bitset<bitSetSize>, int, stdHash>  &uniqueKmers,  char nextLineFlag, std::string inputFile, int kmerSize, int ctrCutoff);
+//value returned is the average unique kmer count
+uint_fast64_t readUniqueKmers(spp::sparse_hash_map<std::bitset<bitSetSize>, int, stdHash>  &uniqueKmers,  char nextLineFlag, std::string inputFile, int kmerSize, int ctrCutoff);
 
 //debugging function for a given cluster ID will print all kmers that point to that cluster
 void printSingleCluster( google::dense_hash_map<uint_fast64_t, long, customHash> &clusterKmers, uint_fast64_t clusterID, int kmerSize);
@@ -59,10 +60,10 @@ void filterClusters(std::unordered_map<double, double > &linkClusters, //hash ta
 
 //int numberCalled This variable holds the number of times this function was called per input sequencing file
 
-std::vector<std::string> getReads(spp::sparse_hash_map<std::bitset<bitSetSize>, int, stdHash>  &uniqueKmers, int numFiles, char nextLineFlag, std::string inputFile, int kmerSize);
+std::vector<std::string> getReads(spp::sparse_hash_map<std::bitset<bitSetSize>, int, stdHash>  &uniqueKmers, int numFiles, char nextLineFlag, std::string inputFile, int kmerSize, std::string outputDir);
 
 //function to read in Clusters do some filtering and pass the filtered Clusters to be assembled
-void readInCluster(std::string &fileName, int cutoffClusterSize, int clusterKmerSize, int tid,  std::ofstream &contigOut, long &clusterNumber, std::ofstream &debuggingMatrix); //tid is for debugging purposes variable stores the thread id
+void readInCluster(std::string &fileName, int cutoffClusterSize, int clusterKmerSize, int tid,  std::ofstream &contigOut, long &clusterNumber, std::ofstream &debuggingMatrix, uint_fast64_t averageUniqueKmerCount); //tid is for debugging purposes variable stores the thread id averageUniqueKmerCount is a variable storing the avergae number of times a unique kmer is present in the sequencing library I am using this for debugging purposes
 
 void mergeClusters(std::vector<std::string> &fileNames);
 

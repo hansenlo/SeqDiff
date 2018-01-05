@@ -510,7 +510,8 @@ printMatrix(matrix, test, combinedNuc, percentBadCol, clusterID[0], debugging, p
        goodContig=checkContig(combinedNuc, readSize, badColCtr, Nctr, percentBadCol, percentNs);
 
 
-       
+       string printableClusterID=clusterID[0];
+
 
       if(goodContig==true)
 	{
@@ -532,10 +533,12 @@ printMatrix(matrix, test, combinedNuc, percentBadCol, clusterID[0], debugging, p
 	}else
 	{
 	  contigs.push_back("0");
+
+	  
+	  printMatrix(matrix, rowsToAssemble, combinedNuc, percentBadCol, printableClusterID, debugging, percentNs);
 	}
 
 
-      string printableClusterID=clusterID[0];
       int oldSize;
 
       if(percentNs>0 && percentNs<0.03 && goodContig==true)
@@ -559,7 +562,7 @@ printMatrix(matrix, test, combinedNuc, percentBadCol, clusterID[0], debugging, p
 	}
 
     
-      printMatrix(matrix, rowsToAssemble, combinedNuc, percentBadCol, printableClusterID, debugging, percentNs); //debugging only print alignment Matrix
+      //printMatrix(matrix, rowsToAssemble, combinedNuc, percentBadCol, printableClusterID, debugging, percentNs); //debugging only print alignment Matrix
 
 
       
@@ -575,9 +578,7 @@ printMatrix(matrix, test, combinedNuc, percentBadCol, clusterID[0], debugging, p
 
 
 	      extractVariants(matrix, rowsToAssemble, combinedNuc, contigs, startContig, cutoffMinNuc, readSize);
-
-	  
-	 
+	  	 
 
 	  if(contigs.size()>oldSize)
 	    { 
@@ -658,7 +659,7 @@ printMatrix(matrix, test, combinedNuc, percentBadCol, clusterID[0], debugging, p
 	      
 		  string subClusterID=clusterID[0]+"_"+std::to_string(clusterCtr);
 
-		  printMatrix(matrix, cluster, combinedNuc, percentBadCol, subClusterID, debugging, percentNs); //debugging only print alignment Matrix
+		  //printMatrix(matrix, cluster, combinedNuc, percentBadCol, subClusterID, debugging, percentNs); //debugging only print alignment Matrix
 	  
 		  if(goodContig==true)
 		    {
@@ -669,6 +670,9 @@ printMatrix(matrix, test, combinedNuc, percentBadCol, clusterID[0], debugging, p
 		    {
 		      contigs.push_back("0"); 
 		      clusterID.push_back(subClusterID);
+
+		      printMatrix(matrix, cluster, combinedNuc, percentBadCol, subClusterID, debugging, percentNs); //debugging only print alignment Matrix
+	  
 
 		    }
 		}

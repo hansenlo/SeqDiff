@@ -123,6 +123,9 @@ void readInFasta(std::unordered_map<std::string, std::string> &genome, std::stri
 //the next two words are the corresponding words that match the reference i.e. one bp further out from the unique words
 void getUniqueWordsContigs(google::dense_hash_map<std::bitset<bitSetSize>, int, stdHash>  &uniqueKmers, std::string contigFile, std::unordered_map<uint_fast64_t, std::vector< std::bitset<bitSetSize> >, stdHash> &pairedUniqueKmers);
 
+//function will search the string source find all occurances of the parameter find and replace them with whatever is in the variable replace 
+void find_and_replace(std::string& source, std::string const& find, std::string const& replace);
+
 
 //function taks as input an integer and will return the kmer coded for by the integer
 std::string int2String(uint_fast64_t number, int kmerSize);

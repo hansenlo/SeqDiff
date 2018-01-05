@@ -39,7 +39,8 @@ void parseSam(vector<vector<string>> &sam, string samFile, int mapCutoff=0);
 void split(vector<string> &tokenizedString,  string str, char delimiter);
 
 //given a vcf file parse it and return it as a matrix every row of the matrix will be a variant call
-void parseVcf(vector<vector<string>> &vcf, string vcfFile);
+//sizeCutoff is the special case when you want to only get deletions of a certain size 0 means take all variants 
+void parseVcf(vector<vector<string>> &vcf, string vcfFile, int sizeCutoff);
 
 //append the number of reference sequences extracted from the local vicinity of the variant each sequence will be kmerSize long
 void parseVcfAppendSeq(vector<vector<string>> &vcf, vector<vector<string>> &refSeq, string vcfFile, unordered_map<string, string> &genome, int numToAppend, int kmerSize);
@@ -92,6 +93,11 @@ void extractString(string &info1, string &info2, string &type1, string &type2, s
 void readKmers();
 
 
+void filterCalls(string vcfFile, string contigEdgesAlignment, int cutoffSize);
+
+//this is just a very small functio to set the zygosity for variants that overlap in order to use vcf eval properly. 
+void setZygosity(vector<vector<string>> &vcf);
+
 const int bitWord=16;
 
 /*usage
@@ -140,7 +146,7 @@ int main(int argc, char *argv[] )
 
   string flag=argv[1];
   string inputFile=argv[2];
-  
+  string refGenome=argv[3];
 
   
 
@@ -150,16 +156,37 @@ int main(int argc, char *argv[] )
     {
 
       cerr<<"Starting to read in genome \n";
-					  
+	
+
+				  
+      //readInFasta(genome, "/data/Genomes/cElegans10/allChr.fa");
+      
+      readInFasta(genome, refGenome);
+      
+
       //readInFasta(genome, "/data/Genomes/human19/allChrhg19InOrder.fa"); //function to read in a multi fasta file and store it in a hash table
 
-      readInFasta(genome, "/data/Genomes/entireHuman19Broad/hs37d5_chrAdded.fa"); //function to read in a multi fasta file and store it in a hash table
+      //readInFasta(genome, "/data/Genomes/entireHuman19Broad/hs37d5_chrAdded.fa"); //function to read in a multi fasta file and store it in a hash table
+
+
 
   //cerr<<"starting to call indels"<<endl;
 
-      callIndels(inputFile, 15, genome, 0.05);
-	
+      
+      callIndels(inputFile, 30, genome, 0.05);
+
+      /*
+      string commandString="/data/bin/bbmap/bbmap.sh ref=";
+      commandString=commandString+refGenome+" sam=1.3 mdtag=t in=contigEdges.fasta out=contigEdges.sam";
+
+      const char *command = commandString.c_str();
+      system(command);
+      
+
+            filterCalls("indelCalls.vcf", "contigEdges.sam", 50);
+
       return(0);
+      */
     }
 
   if(flag=="d")
@@ -173,7 +200,7 @@ int main(int argc, char *argv[] )
 
   //   parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/SimulatedDataOutput200bpReads/SV_Deletions_seq.vcf"); 
 
-      parseVcf(vcfResults, inputFile); 
+      parseVcf(vcfResults, inputFile, 0); 
 
 
   //parseVcf(vcfResults, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/SimulatedDataOutput/SV_calls.vcf"); 
@@ -184,9 +211,22 @@ int main(int argc, char *argv[] )
 
       cerr<<"duplicates removed "<<endl;
 
+      cerr<<" Setting genotypes for variants at the same position "<<endl;
+      
       printVcf(vcfResults, "deDuplicatedVariants.vcf");
 
-      cerr<<"reading in duplicated file adding genomic sequence "<<endl;
+      //cerr<<"reading in duplicated file adding genomic sequence "<<endl;
+
+      vcfResults.clear();
+
+      parseVcf(vcfResults, "deDuplicatedVariants.vcf", 0); 
+
+      cerr<<"########number of variants is ###########"<<vcfResults.size()<<endl;
+
+      setZygosity(vcfResults);
+
+      printVcf(vcfResults, "deDuplicatedVariants_adjustedGT.vcf");
+
 
   //parseVcfAppendSeq(vcfResults, refSeq, "/home/hansenlo/SeqDiff/gitHubProject/SeqDiff/SimulatedDataOutput/deDuplicated.vcf",  genome, 100, 45);
 
@@ -516,55 +556,67 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
   string cigar, chr, readSeq;
   unsigned long long flag;
 
-  ofstream snpOut, indelOut;
+  ofstream snpOut, indelOut, edgesOut;
   snpOut.open("SnpCalls.vcf");
   indelOut.open("indelCalls.vcf");
 
+  edgesOut.open("contigEdges.fasta");
+  
 
   //snp file header
+
+
+  
+  
+  
+  bool GIBFormat=true;
+
 
 
 
   //my vcf output
   
+  if(GIBFormat==false)
+    {
+      snpOut<<"##fileformat=VCFv4.2\n";
+      snpOut<<"##reference=hg19\n";
+      snpOut<<"##INFO=<ID=Contig,Number=1,Type=String,Description=\"Contig id the variant was derived from\">\n";
+      snpOut<<"##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
+      snpOut<<"##INFO=<ID=AlleleFraction,Number=1,Type=Float,Description=\"The number of reads in contig cluster variant was derived from divided by the coverage in a 200 bp window centered on variant\">\n";
+      snpOut<<"##FORMAT=<ID=GT,Number=1,Type=Integer,Description=\"Genotype\">\n";
+      snpOut<<"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNA12878\n";
 
-  snpOut<<"##fileformat=VCFv4.2\n";
-  snpOut<<"##reference=hg19\n";
-  snpOut<<"##INFO=<ID=Contig,Number=1,Type=String,Description=\"Contig id the variant was derived from\">\n";
-  snpOut<<"##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
-  snpOut<<"##INFO=<ID=AlleleFraction,Number=1,Type=Float,Description=\"The number of reads in contig cluster variant was derived from divided by the coverage in a 200 bp window centered on variant\">\n";
-  snpOut<<"##FORMAT=<ID=GT,Number=1,Type=Integer,Description=\"Genotype\">\n";
-  snpOut<<"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNA12878\n";
 
-
-  indelOut<< "##fileformat=VCFv4.2\n";
-  indelOut<< "##reference=hg19\n";
-  indelOut<< "##INFO=<ID=Contig,Number=1,Type=String,Description=\"Contig id the variant was derived from\">\n";
-  indelOut<< "##INFO=<ID=Length,Number=1,Type=Integer,Description=\"The length of the indel\">\n";
-  indelOut<< "##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
-  indelOut<< "##INFO=<ID=AlleleFraction,Number=1,Type=Float,Description=\"The number of reads in contig cluster variant was derived from divided by the coverage in a 200 bp window centered on variant\">\n";
-  indelOut<< "##FORMAT=<ID=GT,Number=1,Type=Integer,Description=\"Genotype\">\n";
-  indelOut<< "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNA12878\n";
- 
+      indelOut<< "##fileformat=VCFv4.2\n";
+      indelOut<< "##reference=hg19\n";
+      indelOut<< "##INFO=<ID=Contig,Number=1,Type=String,Description=\"Contig id the variant was derived from\">\n";
+      indelOut<< "##INFO=<ID=Length,Number=1,Type=Integer,Description=\"The length of the indel\">\n";
+      indelOut<< "##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
+      indelOut<< "##INFO=<ID=AlleleFraction,Number=1,Type=Float,Description=\"The number of reads in contig cluster variant was derived from divided by the coverage in a 200 bp window centered on variant\">\n";
+      indelOut<< "##FORMAT=<ID=GT,Number=1,Type=Integer,Description=\"Genotype\">\n";
+      indelOut<< "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNA12878\n";
   
 
+    }
+  
 
+  if(GIBFormat==true)
+    {
   //vcf output for justin GIB
+  
+      snpOut<<"##fileformat=VCFv4.2\n";
+      snpOut<<"##reference=hg19\n";
+      snpOut<<"##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
+      snpOut<<"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n";
 
-  /*
-  snpOut<<"##fileformat=VCFv4.2\n";
-  snpOut<<"##reference=hg19\n";
-  snpOut<<"##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
-  snpOut<<"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n";
 
-
-  indelOut<< "##fileformat=VCFv4.2\n";
-  indelOut<< "##reference=hg19\n";
-  indelOut<< "##INFO=<ID=Length,Number=1,Type=Integer,Description=\"The length of the indel\">\n";
-  indelOut<< "##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
-  indelOut<< "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n";
-  */
-
+      indelOut<< "##fileformat=VCFv4.2\n";
+      indelOut<< "##reference=hg19\n";
+      indelOut<< "##INFO=<ID=Length,Number=1,Type=Integer,Description=\"The length of the indel\">\n";
+      indelOut<< "##INFO=<ID=Type,Number=1,Type=String,Description=\"The type of the Variant\">\n";
+      indelOut<< "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n";
+  
+    }
 
 
   parseSam(alignments, alignmentFile, mapCutoff);
@@ -578,8 +630,16 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
   long mappingQuality;
   
 
+
   for(i=0; i<alignments.size(); i++)
     {
+      //MAY HAVE TO REMOVE THIS this ensures variant calls start with c which implies chr
+      //############################# this may not be generally applicable!!!
+      // if(alignments[i][2][0]!='c')
+      //{
+      // continue;
+      //}
+
 
       flag=stoull(alignments[i][1], NULL, 10);
 
@@ -710,11 +770,12 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
       
       
       //if hard or soft clipping is greater than 30% of the contig than do not use that contig for indel calling
-      if( (((sizeSoftClipped/readAlign.size())>0.3) || ((sizeHardClipped/readAlign.size())>0.3)) && mappingQuality<30)
-	{
-	  continue;
-	}
+      //if( (((sizeSoftClipped/readAlign.size())>0.3) || ((sizeHardClipped/readAlign.size())>0.3)) && mappingQuality<30)
+      //{
+      //  continue;
+      //}
       
+
 
 
       
@@ -729,7 +790,8 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
       //only call Snps and Indels for variants that fall in the middle of the contig because true variants should almost always be in the middle
       //and alignment artifacts will be on the ends. Only call variants that are at least ten percent of the contig length inside the contig
      
-      double sizeInto=readAlign.size()*percentCutoff;
+      string leftSide, rightSide; //These strings will hold the left and right contig edges for large contigs 
+      string fastaheader;
 
       double temp=refPos;
 
@@ -740,6 +802,21 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
       int slidingWindowSize=10;
       int slidingWindowCtr=0;
       int Ncutoff=1; //if more than Ncutoff bases in the last slidingWindowSize are greater than Ncutoff than don't call that variant
+
+      int sizeRead=alignments[i][9].length(); //the length of the aligned segment
+
+
+      double sizeInto=sizeRead*percentCutoff;
+
+
+      int readBaseCtr=0; //a count of the number of bases that have been encountered in the the read
+
+      //if reference sequence contains anything but A,C,G,T or N then do not call variants for this region
+      if(refAlign.find_first_not_of("ACGTacgtN-")!=std::string::npos)
+	{
+	  continue;
+	}
+
 
       //running through the alignment calling the snps and indels
       for(int k=0; k<(readAlign.size()-sizeInto); k++)
@@ -778,6 +855,12 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 	    }
 
 
+	  if(readAlign[k]!='-')
+	    {
+	      readBaseCtr++;
+	    }
+
+
 	  if((readAlign[k]!='-' && refAlign[k]!='-') && k >=sizeInto)
 	    {
 	      startedSearch=true;
@@ -790,8 +873,12 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 	    {
 	      continue;
 	    }
-	  
-
+	 
+	  //	   if(alignments[i][0]=="6442943_58")
+	  //{
+	  //  cerr<<"reached this point  k is "<<k<<endl;
+ 
+	  //}
 	  
 
 	  //if have an insertion immediately followed by a deletion or vice versa then  need to keep track of last reference base
@@ -809,6 +896,9 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 		  return;
 		}
 
+
+
+
 	      //deletion
 	      if(readAlign[k]=='-')
 		{
@@ -820,19 +910,22 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 		      deletion=true;
 		      alt=string(1, toupper(refAlign[k-1]));
 
-		      /*		      
-		      if(alignments[i][0]=="141210_68")
-			{
-			  cerr<<"inside initial deletion statement k is "<<k<<endl;
-			  cerr<<"ref is "<<ref<<endl;
-			  cerr<<"alt is "<<alt<<endl;
 
-			  cerr<<"readAlign is "<<readAlign<<endl;
-			  cerr<<"refAlign is  "<<refAlign<<endl;
-			  cerr<<"\n\n\n\n"<<endl;
-			}
-		      */
+		      //if(alignments[i][0]=="1974647_80")
+		      //{
+		      //cerr<<"inside initial deletion statement k is "<<k<<endl;
+		      //cerr<<"ref is "<<ref<<endl;
+		      //cerr<<"alt is "<<alt<<endl;
 
+		      //cout<<"readAlign is "<<readAlign<<endl;
+		      //cout<<"refAlign is  "<<refAlign<<endl;
+		      //cerr<<"\n\n\n\n"<<endl;
+			 
+		      //}
+		      
+
+
+		      
 		  
     
 		  
@@ -875,8 +968,20 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
 		      posIns=refPos-1;
 
-		      info=alignments[i][0]+";Length="+std::to_string(alt.size()-1)+";Type=INS;AlleleFraction=.";
-		      printIndel=alignments[i][2]+"\t"+std::to_string(posIns)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
+		      if(GIBFormat==false)
+			{
+			  info=alignments[i][0]+";Length="+std::to_string(alt.size()-1)+";Type=INS;AlleleFraction=.";
+			  printIndel=alignments[i][2]+"\t"+std::to_string(posIns)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
+			}
+		      
+
+		      if(GIBFormat==true)
+			{
+		      //Justin GIB format insertion
+			  info="Length="+std::to_string(alt.size()-1)+";Type=INS";
+
+			  printIndel=alignments[i][2]+"\t"+std::to_string(posIns)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+".\t"+".";
+			}
 
 		        if(Nctr<Ncutoff)
 			{
@@ -960,13 +1065,97 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 		      //subtract 1 from reference size because ref sequence includes the base before the deletion
 		      posDel=refPos-(ref.size());
 
-		      info=alignments[i][0]+";Length="+std::to_string(ref.size()-1)+";Type=DEL;AlleleFraction=.";
-		      printIndel=alignments[i][2]+"\t"+std::to_string(posDel)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
+
+		      if(GIBFormat==false)
+			{
+
+			  if(readBaseCtr >(sizeRead*0.2) && (sizeRead-readBaseCtr)>(sizeRead*0.2)) //making sure if calling indels the indels is toward the middle of the contig and there is enough support on either end to call it 
+			    {	    
+			     
+			      info=alignments[i][0]+";Length="+std::to_string(ref.size()-1)+";Type=DEL;AlleleFraction=.";
+			      printIndel=alignments[i][2]+"\t"+std::to_string(posDel)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
+
+			     
+			      //			       if(alignments[i][0]=="4105336_35")
+			      //{
+			      //  cerr<<"inside first deletion statment "<<endl;
+			      //}
+
+ 	
+			      if((ref.size()-1)>=50)
+				{
+
+				  		      //getting left side of the contig
+				  leftSide=readAlign.substr(0, k-1);
+				  rightSide=readAlign.substr(k);
+
+
+				  
+				  fastaheader=">"+alignments[i][0];
+
+
+				  
+				  find_and_replace(leftSide, "-", "");
+				  find_and_replace(rightSide, "-", "");
+
+
+				  edgesOut<<fastaheader<<"_Left"<<endl;
+				  edgesOut<<leftSide<<endl;
+			      
+				  edgesOut<<fastaheader<<"_Right"<<endl;
+				  edgesOut<<rightSide<<endl;
+
+				}
+
+			    }
+			}
+
+
+		        if(GIBFormat==true)
+			{
+//making sure if calling indels the indels is toward the middle of the contig and there is enough support on either end to call it
+			  if(readBaseCtr>(sizeRead*0.2) && (sizeRead-readBaseCtr)>(sizeRead*0.2)) 
+			    {
+			      
+
+		      //Justin GIB format insertion
+			      info="Length="+std::to_string(ref.size()-1)+";Type=DEL";
+			      printIndel=alignments[i][2]+"\t"+std::to_string(posDel)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+".\t"+".";
+
+			     
+
+
+			      if((ref.size()-1)>=50)
+				{
+
+				  leftSide=readAlign.substr(0, k-1);
+				  rightSide=readAlign.substr(k);
+
+
+
+				  fastaheader=">"+alignments[i][0];
+
+				  find_and_replace(leftSide, "-", "");
+				  find_and_replace(rightSide, "-", "");
+
+				  edgesOut<<fastaheader<<"_Left"<<endl;
+				  edgesOut<<leftSide<<endl;
+			      
+				  edgesOut<<fastaheader<<"_Right"<<endl;
+				  edgesOut<<rightSide<<endl;
+				}
+
+			
+			    }
+			}
+
+
 
 		      if(Nctr<Ncutoff)
 			{
-			
-			  indelOut<<printIndel<<endl;
+			  
+			  indelOut<<printIndel<<endl;			
+			 
 			}
 
 
@@ -1016,13 +1205,29 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
 		 
 
-		  info=alignments[i][0]+";Type=SNP;AlleleFraction=.";
-		  string printSnp=alignments[i][2]+"\t"+std::to_string(refPos)+"\t"+"."+"\t"+string(1, toupper(refAlign[k]))+"\t"+string(1, toupper(readAlign[k]))+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
-	
+		  
+		  string printSnp;
+
+		  if(GIBFormat==false)
+		    {
+		      info=alignments[i][0]+";Type=SNP;AlleleFraction=.";
+		  
+		      printSnp=alignments[i][2]+"\t"+std::to_string(refPos)+"\t"+"."+"\t"+string(1, toupper(refAlign[k]))+"\t"+string(1, toupper(readAlign[k]))+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
+		    }
+
+		  if(GIBFormat==true)
+		    {
+
+		      info="Type=SNP;AlleleFraction=.";
+		  
+		  //Justins Genome in a bottle format
+		      printSnp=alignments[i][2]+"\t"+std::to_string(refPos)+"\t"+"."+"\t"+string(1, toupper(refAlign[k]))+"\t"+string(1, toupper(readAlign[k]))+"\t"+"."+"\tPASS\t"+info+"\t"+".\t"+".";
+		    }
+
 		   if(Nctr<Ncutoff)
 			{
 		
-			  snpOut<<printSnp<<endl;
+			  //snpOut<<printSnp<<endl;
 		
 			}
 		}
@@ -1075,12 +1280,27 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
 		  posIns=refPos-1;
 
-		  info=alignments[i][0]+";Length="+std::to_string(alt.size()-1)+";Type=INS;AlleleFraction=.";
-		  printIndel=alignments[i][2]+"\t"+std::to_string(posIns)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
+		  if(GIBFormat==false)
+		    {
+
+		      info=alignments[i][0]+";Length="+std::to_string(alt.size()-1)+";Type=INS;AlleleFraction=.";
+		      printIndel=alignments[i][2]+"\t"+std::to_string(posIns)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
+		    }
+		  
+		  if(GIBFormat==true)
+		    {
+		      //Justin GIB format insertion
+		      info="Length="+std::to_string(alt.size()-1)+";Type=INS";
+		      printIndel=alignments[i][2]+"\t"+std::to_string(posIns)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+".\t"+".";
+		    }
+
+
 
 		  if(Nctr<Ncutoff)
 		    {
 		
+			  
+
 		      indelOut<<printIndel<<endl;
 		    }
 		  insertion=false;
@@ -1134,13 +1354,103 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 
 		  posDel=refPos-(ref.size());
 
+		  if(GIBFormat==false)
+		    {
+		      if(readBaseCtr>(sizeRead*0.2) && (sizeRead-readBaseCtr)>(sizeRead*0.2)) //making sure if calling indels the indels is toward the middle of the contig and there is enough support on either end to call it 
+			{	    
+			 
+			  info=alignments[i][0]+";Length="+std::to_string(ref.size()-1)+";Type=DEL;AlleleFraction=.";
+			  printIndel=alignments[i][2]+"\t"+std::to_string(posDel)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
+			
 
-		  info=alignments[i][0]+";Length="+std::to_string(ref.size()-1)+";Type=DEL;AlleleFraction=.";
-		  printIndel=alignments[i][2]+"\t"+std::to_string(posDel)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+"GT\t"+"1/1";
+
+
+			  //only check the edges of deletions larger than 50
+			  if((ref.size()-1)>=50)
+			    {
+			 
+			      leftSide=readAlign.substr(0, k-1);
+			       rightSide=readAlign.substr(k);
+
+
+			      //			      if(alignments[i][0]=="4105336_35")
+			      //{
+			      //  cerr<<"inside print edges if statement "<<endl;
+			      //}
+
+			      fastaheader=">"+alignments[i][0];
+			  
+
+			      find_and_replace(leftSide, "-", "");
+			      find_and_replace(rightSide, "-", "");
+
+			      edgesOut<<fastaheader<<"_Left"<<endl;
+			      edgesOut<<leftSide<<endl;
+
+			      edgesOut<<fastaheader<<"_Right"<<endl;
+			      edgesOut<<rightSide<<endl;
+			    }
+
+			}
+		    }
 		  
+		  if(GIBFormat==true)
+		    {
+
+		      if(readBaseCtr>(sizeRead*0.2) && (sizeRead-readBaseCtr)>(sizeRead*0.2)) //making sure if calling indels the indels is toward the middle of the contig and there is enough support on either end to call it 
+			{	    
+
+			  
+		      //Justin GIB format insertion
+			  info="Length="+std::to_string(ref.size()-1)+";Type=DEL";
+			  printIndel=alignments[i][2]+"\t"+std::to_string(posDel)+"\t"+"."+"\t"+ref+"\t"+alt+"\t"+"."+"\tPASS\t"+info+"\t"+".\t"+".";
+
+			  
+
+
+			  if((ref.size()-1)>=50)
+			    {
+
+			      
+			
+			      fastaheader=">"+alignments[i][0];
+
+			      leftSide=readAlign.substr(0, k-1);
+			      rightSide=readAlign.substr(k);
+
+
+			      if(alignments[i][0]=="1974647_80")
+				{
+				  cout<<"readAlign is "<<readAlign<<endl;
+				  cout<<"refAlign is  "<<refAlign<<endl;
+				  cout<<"leftSide is"<<leftSide<<endl;
+				  cout<<"rightSide is"<<rightSide<<endl;
+				  
+				  
+				}
+
+
+
+
+			      find_and_replace(leftSide, "-", "");
+			      find_and_replace(rightSide, "-", "");
+
+
+			      edgesOut<<fastaheader<<"_Left"<<endl;
+			      edgesOut<<leftSide<<endl;
+
+			      edgesOut<<fastaheader<<"_Right"<<endl;
+			      edgesOut<<rightSide<<endl;
+			    }
+			}
+		    }
+
+
+
+
 		  if(Nctr<Ncutoff)
 		    {
-		
+		      
 		      indelOut<<printIndel<<endl;
 		    }
 		  deletion=false;
@@ -1239,7 +1549,7 @@ void split(vector<string> &tokenizedString, string str, char delimiter) {
 }
 
 
-void parseVcf(vector<vector<string>> &vcf, string vcfFile)
+void parseVcf(vector<vector<string>> &vcf, string vcfFile, int sizeCutoff)
 {
 
   ifstream vcfRecords;
@@ -1273,6 +1583,27 @@ void parseVcf(vector<vector<string>> &vcf, string vcfFile)
 	  if(!line.empty())
 	    {
 	      split(tokenizedString, line, '\t');	  
+	      
+	      
+	      //if the size cutoff is set than only take deltions that are larger than the cutoff size
+	      if(sizeCutoff > 0 && tokenizedString[0][0]!='#') 
+       		{
+
+		  int refSize=tokenizedString[3].length();
+		  int altSize=tokenizedString[4].length();
+		  
+		  if((refSize-altSize)<sizeCutoff)
+		    {
+		      continue;
+		    }
+		  
+
+		  //cout<<tokenizedString[3].length()<<" three is  "<<tokenizedString[3]<<" size cutoff is "<<sizeCutoff<<endl;
+		  //cout<<tokenizedString[4].length()<<"  four is  "<<tokenizedString[4]<<"difference is "<<(tokenizedString[3].length()-tokenizedString[4].length())<<endl;
+		  
+
+		}
+
 	      vcf.push_back(tokenizedString);
 
 	    }
@@ -2663,6 +2994,7 @@ samePositionCtr=0;
        }
 
      
+     
      if(i % 1000000==0)
        {		    
 	 cerr<<"number of records processed is "<<i<<endl;
@@ -2674,10 +3006,12 @@ samePositionCtr=0;
      if(i<(vcfResults.size()-1))
        {
 		    
+	 
+
 	 //if variants are at the same location in the genome and they are the same type and size then discard all but one of them 
 	 if( (vcfResults[i][0]==vcfResults[i+1][0] ) )
 	   {
-	     
+	 
 	       int diff=abs((stoull(vcfResults[i][1], NULL, 10)-stoull(vcfResults[i+1][1], NULL, 10)));
 
 	       //cerr<<"i is "<<i<<" "<<vcfResults[i][7]<<endl;
@@ -2699,6 +3033,8 @@ samePositionCtr=0;
 		 searchString="Type";
 
 		 //cerr<<"info1 and info2 are "<<info1<<"\t"<<info2<<endl;
+
+		 
 
 
 		 extractString(info1, info2, type1, type2, searchString);
@@ -2799,6 +3135,8 @@ samePositionCtr=0;
 		 //delete the duplicates
 		 //vcfResults.erase(vcfResults.begin()+sameIndex, vcfResults.begin()+i);
 
+		 
+
 		 bool foundGoodSeq=false; //variable set to false unless both alternate and ref sequence contains no Ns
 		 std::size_t found;
 		 for(j=sameIndex; j<=i; j++)
@@ -2880,6 +3218,281 @@ void extractString(string &info1, string &info2, string &type1, string &type2, s
 
 }
 
+void filterCalls(string vcfFile, string contigEdgesAlignment, int cutoffSize)
+{
+  
+  int i;
+  vector<string> tokenizedString;
+  ofstream filtered;
+
+
+  filtered.open("filteredCalls.vcf");
+
+  vector<vector<string>> sam;
+  vector<vector<string>> vcfCalls;
+
+  //getting the variant calls ignore variants smaller than the cutoffSize
+  parseVcf(vcfCalls, vcfFile, 0);
+
+  //  cerr<<"after parseVcf "<<endl;
+
+
+  //getting the alignment of the contig edges
+  parseSam(sam, contigEdgesAlignment, 0);
+
+  //load alignments of contig edges into a hash table for easy lookup 
+  unordered_map<string, vector<string>> edgesAlignment;
+
+   for(i=0; i<sam.size(); i++)
+    {
+      edgesAlignment[sam[i][0]]=sam[i]; 
+    }
+  
+
+   for(i=0; i<vcfCalls.size(); i++)
+   {
+     if(vcfCalls[i][0][0]=='#') //do not run header vcf lines
+       {
+	 
+
+	 //print out the header than continue to the next line of the vcf
+	 for(int j=0; j<vcfCalls[i].size(); j++)
+	   {
+	     if(j<(vcfCalls[i].size()-1))
+	       {
+		 filtered<<vcfCalls[i][j]<<"\t";
+	       }
+	     else
+	       {
+		 filtered<<vcfCalls[i][j]<<endl;
+	       }
+	     
+	   }
+
+	 	 continue;
+
+       }
+     
+     int refLength=vcfCalls[i][3].length();
+     int altLength=vcfCalls[i][4].length();
+
+     
+     if((refLength-altLength)>=cutoffSize)
+       {
+
+	 //	 cout<<"3 is "<<vcfCalls[i][3]<<endl;
+	 //cout<<"4 is "<<vcfCalls[i][4]<<endl;
+	 
+     //getting the contig idcout<<vcfCalls[i][3]<<endl;
+
+	 //getting the contig name
+	 tokenizedString.clear();
+	 split(tokenizedString,  vcfCalls[i][7], ';');
+       
+
+
+	 //looking at the left and right alignments of the contigs
+	 string leftSide=tokenizedString[0]+"_Left"; 
+	 string rightSide=tokenizedString[0]+"_Right";
+       
+	 //Check to make sure contig edges are in the alignment
+	 if(edgesAlignment.find(leftSide)!=edgesAlignment.end() && edgesAlignment.find(rightSide)!=edgesAlignment.end())
+	   {
+
+
+	     long leftMappingQuality=stoull(edgesAlignment[leftSide][4], NULL, 10);
+	     long rightMappingQuality=stoull(edgesAlignment[rightSide][4], NULL, 10);
+
+	     
+	     /*
+	     if(leftMappingQuality<30 || rightMappingQuality <30)
+	       {
+		 continue;
+	       }
+	     */
+	     
+
+	     //if the two edges don't align to the same chromosome then do not use that variant
+	     if(edgesAlignment[leftSide][2]!=edgesAlignment[rightSide][2])
+	       {
+		 /*
+		 for(int j=0; j<vcfCalls[i].size(); j++)
+		   {
+		     if(j<(vcfCalls[i].size()-1))
+		       {
+			 cout<<vcfCalls[i][j]<<"\t";
+		       }
+		     else
+		       {
+			 cout<<vcfCalls[i][j]<<endl;
+		       }
+	     
+		   }
+		 */
+
+		 //continue;
+
+	       }
+
+	     //print out the variant
+	     for(int j=0; j<vcfCalls[i].size(); j++)
+	       {
+		 if(j<(vcfCalls[i].size()-1))
+		   {
+		     filtered<<vcfCalls[i][j]<<"\t";
+		   }
+		 else
+		   {
+		     filtered<<vcfCalls[i][j]<<endl;
+		   }
+	     
+	       }
+
+	     
+	   }else
+	   {
+	     cerr<<tokenizedString[0]<<" of the sides of this contig did not align "<<endl;
+	   }
+
+
+
+
+       }else
+       {
+	 //printing out the variant
+	 for(int j=0; j<vcfCalls[i].size(); j++)
+	   {
+	     if(j<(vcfCalls[i].size()-1))
+	       {
+		 filtered<<vcfCalls[i][j]<<"\t";
+	       }
+	     else
+	       {
+		 filtered<<vcfCalls[i][j]<<endl;
+	       }
+	     
+	   }
+
+
+
+       }
+
+
+
+   }
+
+}
+
+
+//this is just a very small functio to set the zygosity for variants that overlap in order to use vcf eval properly. 
+void setZygosity(vector<vector<string>> &vcf)
+{
+
+int call, genotypeIndex, samePositionCtr;
+bool samePosition=false;
+ int sameIndex, j, i;
+samePositionCtr=0;
+
+ string longestRefSeq;
+			
+ for(i=0; i<vcf.size(); i++)
+   {
+     if(vcf[i][0][0]=='#') //do not run header vcf lines
+       {
+	 continue;
+       }
+
+     
+     
+     if(i % 1000000==0)
+       {		    
+	 cerr<<"number of records processed is "<<i<<endl;
+       }
+
+     //cerr<<"number of records processed is "<<i<<endl;
+     //cerr<<vcf[i][7]<<endl;
+		
+     if(i<(vcf.size()-1))
+       {
+		    
+	 
+	 //if variants are at the same location in the genome and they are different types than set the genotype appropriately 
+	 if( (vcf[i][0]==vcf[i+1][0] ) )
+	   {
+	 
+	       int diff=abs((stoull(vcf[i][1], NULL, 10)-stoull(vcf[i+1][1], NULL, 10)));
+
+	       //cerr<<"i is "<<i<<" "<<vcf[i][7]<<endl;
+	       //cerr<<"i+1 is "<<i+1<<" "<<vcf[i+1][7]<<endl;
+
+	       //cerr<<"diff is "<<diff<<endl;
+
+	       //check to see if the type and length of the variants are the same	     
+	    
+		 string type1, type2, info1, info2, searchString;
+		 int startIndex, endIndex;
+		 double length1, length2;
+		 string newRef, newAlt;
+		 info1=vcf[i][7];
+		 info2=vcf[i+1][7];
+
+		 searchString="Type";
+
+		 //cerr<<"info1 and info2 are "<<info1<<"\t"<<info2<<endl;
+
+		 extractString(info1, info2, type1, type2, searchString);
+
+		 //cerr<<"type1 and type2 are "<<type1<<"\t"<<type2<<endl;
+		 
+		 //if the variants are at the same location
+		 if(diff==0)
+		   {
+
+		     //the default is to select the reference sequence for the first variant 
+		     newRef=vcf[i][3];
+		 //checking to see if the variants at the same position that have the same type have the same length
+		     if(type1!=type2)
+		       {
+		     
+		     //cerr<<"reached this point "<<endl;
+			 if(type1=="Type=DEL" || type2=="Type=DEL")
+			   {
+			     if(vcf[i][3].length()>=vcf[i+1][3].length())
+			       {
+				 newRef=vcf[i][3];
+			       }else
+			       {
+				 newRef=vcf[i+1][3];
+			       }
+			     
+			   }
+
+			 newAlt=vcf[i][4]+","+vcf[i+1][4];
+
+			 vcf[i][9]="1/2";
+			 vcf[i][3]=newRef;
+			 vcf[i][4]=newAlt;
+			 vcf[i][7]=vcf[i][7]+vcf[i+1][7];
+			 vcf[i+1][0]="-";
+		       }
+
+		   }
+		 //cerr<<"type1 is "<<type1<<endl;
+		 //return;
+
+	       
+		
+			
+	     
+	   }
+
+       }
+
+   }
+
+
+
+}
 
 
 

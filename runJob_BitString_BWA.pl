@@ -12,7 +12,11 @@ die $@ if $@;
 
 my $expFastq=shift; #the file containing the fastq reads for the experiment
 my $expKmerCounts=shift; #the file containing the counts of how often each kmer occurs
-my $controlFile=shift; #the file containing the control reads if present
+my $kmerSize=shift; #the kmer size
+my $kmerCountCutoff=shift; #how many times a kmer must occur before calling a variant 
+my $outputDir=shift; #the output directory
+
+#my $controlFile=shift; #the file containing the control reads if present
 
 
 #given a contig file and a cutoff indicating how much to start aligning from each end
@@ -34,7 +38,7 @@ sub filterAlignmentsLocal($ $ $);
 #Program to take as input a file name containing a read library and running all commands on it
 
 my($cmd, $line, $i, $header, $outputUnique, $outputOverlapEdena, $contigEdgesOutput, $alignmentOutput, $tempIn, $tempOut);
-my($allReads, @splitLine, $path, $outputKmerLib, $dataset, $blastDB, $tempOutunMappPoorMap);
+my($allReads, @splitLine, $path, $outputKmerLib, $dataset, $blastDB, $tempOutunMappPoorMap, $controlFile);
 
 @splitLine=split(/\//, $expFastq);
 
@@ -42,7 +46,15 @@ print "$splitLine[$#splitLine]\n";
 
 $splitLine[$#splitLine]=~m/(.*).fastq$/;
 
-$header="unique_".$1."_55K";
+#$splitLine[$#splitLine]=~m/(.*).fq$/;
+
+
+my $refGenome="/data/Genomes/cElegans10/allChr.fa";
+
+$refGenome="/data/Genomes/entireHuman19Broad/hs37d5_chrAdded.fa";
+
+
+$header="unique_".$1."_75K";
 
 $dataset=$1;
 
@@ -51,6 +63,9 @@ $dataset=$1;
 
 
 $expFastq=~m/(.*)\/(.*).fastq$/;
+
+#$expFastq=~m/(.*)\/(.*).fq$/;
+
 
 $path=$1."/";
 
@@ -72,7 +87,7 @@ $blastDB="/data/BwaIndex/hs37d5_chrAdded.fa";
 #$blastDB="/data6/sukrit/081216_MiSeq_MMB1newdel_genomeSeq/MappingToReference/MMB1genomeCIRC84.fasta";
 
 
-if(1==1)
+if(1==2)
 {
 #compiling the code
 #$cmd="g++ findDiff_BitString_HashTableVer.cpp spooky.cpp -g -O3 -o findDiff_BitString_HashTableVer -std=c++11 -Wno-deprecated -fopenmp";
@@ -94,7 +109,7 @@ $outputUnique=$header.".fastq";
 
 
 
-if(1==1)
+if(1==2)
 {
 
 #getting those reads that passed the filter running the code
@@ -108,9 +123,25 @@ if(1==1)
 
 #$cmd="time ./findDiff_BitString_HashTableVer $controlFile $file  31 0 $cutoff temp.dat > "."/home/hansenlo/SeqDiff/Results/".$outputUnique;
 
-#$cmd="time ./variantFinder $expKmerCounts $expFastq 45 > temp.dat";
+#usage
 
-$cmd="time ./variantFinder $expKmerCounts $expFastq 55 > temp.dat";
+#variantFinder <experiment Kmer Counts> <experiment Fastq> <kmer Size> <read cutoff> 
+
+
+
+#my $expFastq=shift; #the file containing the fastq reads for the experiment
+#my $expKmerCounts=shift; #the file containing the counts of how often each kmer occurs
+#my $kmerSize=shift; #the kmer size
+#my $kmerCountCutoff=shift; #how many times a kmer must occur before calling a variant 
+#my $outputDir=shift; #the output directory
+
+
+
+$cmd="time /home/hansenlo/SeqDiff/gitHubProject/SeqDiff/variantFinder $expKmerCounts $expFastq $kmerSize $kmerCountCutoff $outputDir";
+
+#$cmd="time ./variantFinder $expKmerCounts $expFastq 45 8 > temp.dat";
+
+#$cmd="time ./variantFinder $expKmerCounts $expFastq 75 > temp.dat";
 
 
 #$cmd="time /home/hansenlo/LamiaSeqDiff/SeqDiff/variantFinder $expKmerCounts $expFastq 45 > temp.dat";
@@ -143,11 +174,17 @@ system($cmd)==0
 
 my $uniqueReadsLocation="/data5/SeqDiffResults/Results/".$header."_unique.fastq";
 
+#####MUST CHANGE!!!####
+#$uniqueReadsLocation="/data5/SeqDiffResults/Results/unique_allHG002_300Xby150bp_55K_unique.fastq";
+
+
+my $contigLocation="/data5/SeqDiffResults/Results/".$header."_contigs.fasta";
+
 #copying sequence to appropriate places
-if(1==1)
+if(1==2)
 {
 #move contigs to appropriate directory
-$cmd="cp /home/hansenlo/SeqDiff/gitHubProject/SeqDiff/contigs.fa /data5/SeqDiffResults/Results/".$header."_contigs.fasta";
+$cmd="cp "."$outputDir"."/contigs.fa /data5/SeqDiffResults/Results/".$header."_contigs.fasta";
 print "####cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
@@ -155,7 +192,7 @@ system($cmd)==0
 
 
 #move unique reads to the appropriat directory 
-$cmd="cp /data/uniqueReads.fastq /data5/SeqDiffResults/Results/".$header."_unique.fastq";
+$cmd="cp "."$outputDir"."/Reads_with_novelKmers.fq /data5/SeqDiffResults/Results/".$header."_unique.fastq";
 print "####cmd is $cmd\n\n";
 system($cmd)==0
     or die "system $cmd failed\n";
@@ -319,18 +356,32 @@ system($cmd)==0
 ######################Aligning the contigs#####################
 #$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."refGenomeOnly_contigEdges.sam";
 
+
+#$header="unique_HG002_bbmap_300Xby150bp_55K";
+
 $alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."_contigs.sam";
 
 my $contigs="/data5/SeqDiffResults/Results/".$header."_contigs.fasta";
+
+#$contigs="/data5/SeqDiffResults/Results/unique_allHG002_300Xby150bp_55K_contigs.fasta";
+
+print "##Removing Ns from edges of contigs##\n";
+
+&removeNs($contigs, 3, "temp_contigs.fa");
+
+$contigs="temp_contigs.fa";
+
+$alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header."_temp_contigs.sam";
+
 
 if(1==1)
 {
 
 #$cmd="rm /data5/SeqDiffResults/Results/Alignment/".$header."*contigs*";  ##############Be careful with THIS!!!!! make sure you are not deleting the wrong files!!!!
 
-print "#######cmd is $cmd\n\n";
-system($cmd)==0
-    or die "system $cmd failed\n";
+#print "#######cmd is $cmd\n\n";
+#system($cmd)==0
+ #   or die "system $cmd failed\n";
 
 
 #$blastDB="/home/hansenlo/Genomes/Bowtie2Index/hg19";
@@ -341,7 +392,14 @@ system($cmd)==0
 
 #$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2   -p 20 -x $blastDB -f $contigs --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Contigs.fasta "."-S $alignmentOutput";
 
-$cmd="time /data/bin/bwa-master/bwa mem -t 20 $blastDB"." $contigs > $alignmentOutput";
+#$cmd="time /data/bin/bwa-master/bwa mem -t 20 $blastDB"." temp_contigs.fa  > $alignmentOutput";
+
+#$cmd="time /data/bin/bbmap/bbmap.sh ref=/data/Genomes/entireHuman19Broad/hs37d5_chrAdded.fa sam=1.3 mdtag=t in=temp_contigs.fa out=".$alignmentOutput;
+
+$cmd="time /data/bin/bbmap/bbmap.sh ref=".$refGenome." maxindel=100000 local=f nfilter=300  sam=1.3 mdtag=t in=temp_contigs.fa out=".$alignmentOutput;
+
+#$cmd="time /data/bin/bbmap/bbmap.sh ref=".$refGenome." maxindel=500000 local=f nfilter=300  sam=1.3 mdtag=t in=temp_contigs.fa out=".$alignmentOutput;
+
 
 
 #$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 --mp 10 --rdg 3,2 --rfg 3,2  -p 20 -x $blastDB -f $contigs --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Contigs.fasta "."-S $alignmentOutput";
@@ -360,13 +418,13 @@ my $contigheader=$header."_contigs";
 $tempOut="/data5/SeqDiffResults/Results/Alignment/".$contigheader.".bam";
 
 #converting alignments to bam format
-$cmd="samtools view -bS $alignmentOutput > ".$tempOut;
-print "#######cmd is $cmd\n\n";
-system($cmd)==0
-    or die "system $cmd failed\n";
+#$cmd="samtools view -bS $alignmentOutput > ".$tempOut;
+#print "#######cmd is $cmd\n\n";
+#system($cmd)==0
+#    or die "system $cmd failed\n";
 
 #sorting the aligments
-$tempIn=$tempOut;
+$tempIn=$alignmentOutput;
 $tempOut="/data5/SeqDiffResults/Results/Alignment/".$contigheader.".sorted";
 
 #sorting bam files
@@ -460,7 +518,7 @@ system($cmd)==0
 #exit();
 
 #extending contig edges
-if(1==1)
+if(1==2)
 {
 
 #######################now working with contig edges###################
@@ -469,13 +527,22 @@ if(1==1)
     my $cutoff=shift;
     my $contigFile=shift;
 
+
+#pruning leading Ns
+#3 is the number of real bases in a row needed to define the edge of a contig
+#&removeNs($contigLocation, 3);
+
+
 print "starting to filter the alignments \n";
 
-&filterAlignments($alignmentOutput, 0.2, $contigs);
+#&filterAlignments($alignmentOutput, 0.2, $contigs);
+
+#this is the newest version of the function
+#&filterAlignments($alignmentOutput, 0.2, "temp_contigs.dat");
 
 
 print "Starting iterative alignment\n";
-#iterativeAlignment($tempOutunMappPoorMap, 20, 80,  $blastDB, $header);
+#&iterativeAlignment($tempOutunMappPoorMap, 20, 80,  $blastDB, $header);
 
 #&iterativeAlignment("/data5/SeqDiffResults/Results/Alignment/unique_platinumChr21_plusUnmapped_contigs_unMapped_poorlyMapped.fasta", 20, 80,  $blastDB, $header);
 
@@ -484,7 +551,10 @@ print "Starting iterative alignment\n";
 #&iterativeAlignment("/data5/SeqDiffResults/Results/unique_allPlatinum_contigs.fasta", 20, 80,  $blastDB, $header);
 
 my $mappingQualityCutoff=35;
-&iterativeAlignment("clippedContigs.fa", 30, 250,  $blastDB, $header, $mappingQualityCutoff);
+#&iterativeAlignment("clippedContigs.fa", 30, 400,  $blastDB, $header, $mappingQualityCutoff);
+
+&iterativeAlignment("temp_contigs.dat", 30, 200,  $blastDB, $header, $mappingQualityCutoff);
+
 
 #&iterativeAlignment($contigs, 20, 180,  $blastDB, $header, $mappingQualityCutoff);
 
@@ -514,7 +584,7 @@ print "Starting to extend alignments\n";
 }
 
 
-if(1==1)
+if(1==2)
 {
 
 
@@ -537,18 +607,18 @@ $alignmentOutput="/data5/SeqDiffResults/Results/Alignment/".$header.".sam";
 
 #$blastDB="/home/gabdank/genomes_fasta/elegans_W235_index";
 
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Reads_with_novelKmers.fa "."-S $alignmentOutput";
 
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data/uniqueReads.fastq --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB "."/data/Reads_with_novelKmers.fa --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Reads_with_novelKmers.fa "."-S $alignmentOutput";
 
 $cmd="time /data/bin/bwa-master/bwa mem -t 35 $blastDB"." $uniqueReadsLocation > $alignmentOutput";
 
 
 #fasta command DONT FORGET
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB -f "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 20 -x $blastDB -f "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Reads_with_novelKmers.fa "."-S $alignmentOutput";
 
 
-#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/seqA "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_uniqueReads.fastq "."-S $alignmentOutput";
+#$cmd="time /home/hansenlo/bin/bowtie2-2.0.0-beta7/bowtie2 -p 4 -x /home/hansenlo/Genomes/Bowtie2Index/seqA "."/data5/SeqDiffResults/Results/"."$outputUnique --un /data5/SeqDiffResults/Results/Alignment/".$header."_unAlignable_Reads_with_novelKmers.fa "."-S $alignmentOutput";
 
 
 print "#######cmd is $cmd\n\n";

@@ -783,7 +783,7 @@ void countUniqueKmers(sparse_hash_map<uint_fast64_t, int, customHash>  &controlK
   seqFile.close();
 }
 
-void readUniqueKmers(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqueKmers,  char nextLineFlag, string inputFile, int kmerSize, int ctrCutoff)
+uint_fast64_t readUniqueKmers(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqueKmers,  char nextLineFlag, string inputFile, int kmerSize, int ctrCutoff)
 {
   ifstream seqFile;
   string line, qualityScores, temp, foo, word, kmer;
@@ -791,7 +791,10 @@ void readUniqueKmers(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  &un
   int ctr, i, revControlValue, controlValue, quality, kmerCtr;
   long totalCtr, limit;
   bool fastq, flag, secondTime, usedRead, qualityReadIn;
-  uint_fast64_t index, positionCtr;
+  uint_fast64_t index, positionCtr, sumUnique, ctrUnique;
+
+  sumUnique=0;
+  ctrUnique=0;
 
   string validChar = "ACGTacgtN";
   string DNAchar="ACGTacgt";
@@ -910,6 +913,10 @@ void readUniqueKmers(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  &un
 	{
 	  continue;
 	}
+
+      sumUnique+=kmerCtr;
+      ctrUnique++;
+
 	
        //ensuring the line is large enough to fit a kmer in it
       if(!(kmer.length()==kmerSize))
@@ -1019,6 +1026,7 @@ void readUniqueKmers(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  &un
 
 	      //cout<<"key is "<<key<<endl;
 
+
 	      uniqueKmers[key]=kmerCtr; //NEED TO UNCOMMENT IN ORDER TO WORK
 	 
 
@@ -1033,7 +1041,7 @@ void readUniqueKmers(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  &un
 	     
   }
       	  
-	 
+   return(sumUnique/ctrUnique);
 
 
   seqFile.close();
@@ -1653,7 +1661,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 					    
 
 				    //if(abs(i-positionFirstClusterIndex)<kmerSize && ((i> (kmerSize)) && (i< (workNodePtr->chunk[j].size()-2*kmerSize)))  )
-				      if(abs(i-positionFirstClusterIndex)<kmerSize && (positionFirstClusterIndex>(kmerSize*2)) && (i< (workNodePtr->chunk[j].size()-2*kmerSize)))    
+				      if(abs(i-positionFirstClusterIndex)<kmerSize && (positionFirstClusterIndex>(kmerSize*1)) && (i< (workNodePtr->chunk[j].size()-2*kmerSize)))    
 				      {
 
 					    
@@ -1692,7 +1700,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 				    if(newClusterIndex!=firstClusterIndex)
 				      {
 
-					if(abs(i-positionFirstClusterIndex)<kmerSize && (positionFirstClusterIndex>(kmerSize*2)) && (i< (workNodePtr->chunk[j].size()-2*kmerSize)))    
+					if(abs(i-positionFirstClusterIndex)<kmerSize && (positionFirstClusterIndex>(kmerSize*1)) && (i< (workNodePtr->chunk[j].size()-2*kmerSize)))    
 					  {
 
 				
@@ -1810,7 +1818,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 
 					   
-					    if(abs(i-positionFirstClusterIndex)<kmerSize && (positionFirstClusterIndex>(kmerSize*2)) && (i< (workNodePtr->chunk[j].size()-2*kmerSize)))    
+					    if(abs(i-positionFirstClusterIndex)<kmerSize && (positionFirstClusterIndex>(kmerSize*1)) && (i< (workNodePtr->chunk[j].size()-2*kmerSize)))    
 					      {
 				  //cerr<<"inside negative stand if condition "<<endl;
 					  //#pragma omp critical(LINK_CLUSTER_REV)
@@ -1849,7 +1857,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 					//if(abs(i-positionFirstClusterIndex)<kmerSize && ((i> (0+kmerSize)) && (i<workNodePtr->chunk[j].size()-2*kmerSize))  )
 					// {
 					    
-					if(abs(i-positionFirstClusterIndex)<kmerSize && (positionFirstClusterIndex>(kmerSize*2)) && (i< (workNodePtr->chunk[j].size()-2*kmerSize)))    
+					if(abs(i-positionFirstClusterIndex)<kmerSize && (positionFirstClusterIndex>(kmerSize*1)) && (i< (workNodePtr->chunk[j].size()-2*kmerSize)))    
 					  {
 					    /* debugging
 					     uniqueReadsBuffer.push_back(workNodePtr->chunk[j]); //store the read sequence
@@ -2104,7 +2112,7 @@ void assignClusters(node * workNodePtr, //a pointer pointing to a chunk of work
 
 //void getReads(sparse_hash_map<uint_fast64_t, int, customHash> &uniqueKmers, sparse_hash_map<uint_fast64_t, ReadCluster *, customHash> &readClusters, char nextLineFlag, string inputFile, int kmerSize, dense_hash_map<uint_fast64_t, uint_fast64_t, customHash> &masterKey )
 
-vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqueKmers, int numFiles, char nextLineFlag, string inputFile, int kmerSize)
+vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  &uniqueKmers, int numFiles, char nextLineFlag, string inputFile, int kmerSize, string outputDir)
 {
   ifstream seqFile;
   string line, header, tempLine, qualityScore;
@@ -2192,7 +2200,22 @@ vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  
   //return(fileNames);
 
    std::unordered_map<double, double > linkClusters;
-   string uniqueReadFile="/data/uniqueReads.fastq";
+   //string uniqueReadFile="/data/uniqueReads.fastq";
+
+   string uniqueReadFile;
+
+   //cout<<"outputDir is "<<outputDir<<endl;
+
+     
+   if(outputDir.back()=='/')
+     {
+       uniqueReadFile=(outputDir+"Reads_with_novelKmers.fq"); //location of where to put file containing contigs
+     }else
+     {
+       uniqueReadFile=(outputDir+"/Reads_with_novelKmers.fq"); //location of where to put file containing contigs
+     }
+     
+
 
    /*
    //Start of debugging code
@@ -2362,6 +2385,9 @@ vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  
 
   //adding the first node
   currentNodePtr=new node;
+
+
+  cerr<<"just started assinging reads to clusters "<<endl;
 
 #pragma omp parallel num_threads(thread_count) default(shared)\
   private(tid, i, workNodePtr)
@@ -2616,6 +2642,8 @@ vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  
 
   
        
+  cerr<<"just finished the assigning reads to clusters "<<endl;
+
   ofstream debuggingLinkingBefore("debuggingLinkingBeforeFiltering.dat");
 
 
@@ -2889,7 +2917,7 @@ void sendClustersToFile(string &uniqueReadFile, google::dense_hash_map<uint_fast
 }
 
 //function to read in file containing many clusters do some filtering on the clusters and assemble them
-void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize, int tid,  ofstream &contigOut, long &clusterNumber, std::ofstream &debuggingMatrix)
+void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize, int tid,  ofstream &contigOut, long &clusterNumber, std::ofstream &debuggingMatrix, uint_fast64_t averageUniqueKmerCount)
 {
   
   ifstream clusterFile;
@@ -2976,8 +3004,6 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
       //can parse string this way because words seperated by spaces
 	  iss>>read>>clusterIdentifier>>stringMaxCount>>qualityFlag>>qualityString;
 	  
-	 
-
 	 
       //convert from string into and integer
 	  clusterID=stoull(clusterIdentifier, NULL, 10);
@@ -3072,12 +3098,13 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	  maxCount=maxCounts[iter->first]; //getting the max unique word count for this cluster
 	 
 	 
-
 	  //ignore clusters that have a unique word that has greater than 500 count
-	  if(maxCount>500)
+	  if(maxCount> (20*averageUniqueKmerCount))
 	    {
 	      continue;
 	    }
+
+	  //cerr<<"clsuter id now is "<<to_string(iter->first)<<endl;
 
 
 
@@ -3096,7 +3123,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	      //#pragma omp critical(DEBUGGING_PROCESSINGCLUSTER)
 	      //{
 	      //cerr<<"thread "<<tid<<" is on cluster "<<iter->first<<endl;
-	      // }  
+	      //}  
 	      
 
 	      ReadCluster cluster(iter->second->size()); //input paramater is number of reads in the cluster
@@ -3143,7 +3170,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 	      //properly using a word based approach so throw it away. 
 	      if(maxKmer==0)
 		{
-		  ///cout<<"inside max kmer if condition cluster is "<<iter->first<<endl;
+		  //cout<<"inside max kmer if condition cluster is "<<iter->first<<endl;
 		  continue;
 		}
 
@@ -3171,6 +3198,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
 	      for(int j=0; j<contigs.size(); j++)
 		{	      
+		 
 		  if(contigs[j].compare("0")!=0) //if a valid contig i.e. not equal to 0 then add it to the clusterBuffer
 		    {
 		      //cout<<contig<<endl;
@@ -3202,6 +3230,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
 		for(z=0; z<contigBuffer.size(); z++)
 		  {
+
 		    //contigOut<<">"<<clusterNumber<<"\n";
 		    
 		    contigOut<<">"<<contigIDs[z]<<"\n";	    
@@ -3224,6 +3253,7 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
       
 
+
       
 #pragma omp critical(FLUSHING_CLUSTER) //flush last contigs left in buffer to a file
 	      {
@@ -3231,6 +3261,8 @@ void readInCluster(string &fileName, int cutoffClusterSize, int clusterKmerSize,
 
 		for(z=0; z<contigBuffer.size(); z++)
 		  {
+
+
 		    contigOut<<">"<<contigIDs[z]<<"\n";
 		    contigOut<<contigBuffer[z]<<"\n";
 		    
