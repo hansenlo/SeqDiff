@@ -22,10 +22,9 @@
 #include <omp.h>
 #include <iostream>
 
-/*
-#include <seqan/store.h>
-#include <seqan/consensus.h>
-*/
+
+//#include <seqan/store.h>
+//#include <seqan/consensus.h>
 
 
 //using namespace seqan;
@@ -2639,6 +2638,11 @@ void readInClusters(vector<string> &fileNames)
 	  //iter->second->erase( unique( iter->second->begin(), iter->second->end() ), iter->second->end() );
 	  auto last=unique(iter->second->begin(), iter->second->end());
 	  iter->second->erase(last, iter->second->end());
+
+	  /*
+
+	    test
+	  */
 
 
 	  //number of reads in cluster cutoff
