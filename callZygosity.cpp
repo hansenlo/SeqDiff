@@ -30,7 +30,7 @@ using std::ofstream;
 
 //given a contig alignment file parse the md and cigar string and call indels and snps mapCutoff is the minimum mapping quality necassary
 //percentCutoff is the minimum percentage into the contig the variant needs to be in order to be called
-void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, string> &genome, double percentCutoff);
+void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, string> &genome, double percentCutoff, string outDir);
 
 //given a sam file parse it and return it as a matrix every row of the matrix will be an alignment file
 //mapCutoff is the mapping quality cutoff
@@ -147,7 +147,7 @@ int main(int argc, char *argv[] )
   string flag=argv[1];
   string inputFile=argv[2];
   string refGenome=argv[3];
-
+  string outDir=argv[4];
   
 
   unordered_map<string, string> genome;
@@ -173,7 +173,7 @@ int main(int argc, char *argv[] )
   //cerr<<"starting to call indels"<<endl;
 
       
-      callIndels(inputFile, 30, genome, 0.05);
+      callIndels(inputFile, 30, genome, 0.05, outDir);
 
       /*
       string commandString="/data/bin/bbmap/bbmap.sh ref=";
@@ -550,15 +550,15 @@ return(0);
 
 //algorithm is to build the alignment from the cigar string then calling the snps and indels by stepping through the alignment 
 //percentCutoff is the minimum percentage into the contig the variant needs to be in order to be called
-void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, string> &genome, double percentCutoff)
+void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, string> &genome, double percentCutoff, string outDir)
 {
   vector<vector<string>> alignments;
   string cigar, chr, readSeq;
   unsigned long long flag;
 
   ofstream snpOut, indelOut, edgesOut;
-  snpOut.open("SnpCalls.vcf");
-  indelOut.open("indelCalls.vcf");
+  snpOut.open(outDir+"SnpCalls.vcf");
+  indelOut.open(outDir+"indelCalls.vcf");
 
   edgesOut.open("contigEdges.fasta");
   
@@ -1227,7 +1227,7 @@ void callIndels(string alignmentFile, int mapCutoff, unordered_map<string, strin
 		   if(Nctr<Ncutoff)
 			{
 		
-			  //snpOut<<printSnp<<endl;
+			  snpOut<<printSnp<<endl;
 		
 			}
 		}

@@ -137,7 +137,7 @@ if(1==2)
 
 
 
-$cmd="time /home/hansenlo/SeqDiff/gitHubProject/SeqDiff/variantFinder $expKmerCounts $expFastq $kmerSize $kmerCountCutoff $outputDir";
+$cmd="time /home/hansenlo/SeqDiff/gitHubProject/SeqDiff/variantFinder -k $expKmerCounts -f $expFastq -s $kmerSize -c $kmerCountCutoff -o $outputDir";
 
 #$cmd="time ./variantFinder $expKmerCounts $expFastq 45 8 > temp.dat";
 
