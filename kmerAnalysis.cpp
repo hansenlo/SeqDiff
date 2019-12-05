@@ -2137,7 +2137,6 @@ vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  
 
   dense_hash_map<uint_fast64_t, int, customHash> refPositions; //hash table contains the positions of every unique word in the reference read
   refPositions.set_empty_key(-20);
-
  
 
   dense_hash_map<std::bitset<bitSetSize>, uint_fast32_t, stdHash> clusterKmers; //hash table key is kmer value is the cluster that kmer belongs to
@@ -2189,7 +2188,9 @@ vector<string> getReads(spp::sparse_hash_map<bitset<bitSetSize>, int, stdHash>  
     {
       //line="/home/massa/Temp/file"+to_string(i)+".dat";
 
-      line="/data/Temp/"+to_string(i)+".dat";
+      //line="/data/Temp/"+to_string(i)+".dat";
+
+      line=outputDir+to_string(i)+".dat";
 
       //line="/data1/HEM0013-131-LYMPH.bam.aspera-env et al/Temp/"+to_string(i)+".dat";
       fileNames.push_back(line);

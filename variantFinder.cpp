@@ -2,7 +2,7 @@
 #include "utilities.h"
 #include "kmerAnalysis.h"
 
-
+#include <unistd.h>
 
 using std::cout;
 using std::endl;
@@ -46,25 +46,83 @@ int main(int argc, char *argv[] )
   string outputDir;
 
 
+// Wrap everything in a try block.  Do this every time, 
+	// because exceptions will be thrown for problems.
+  try {  
+
+	// Define the command line object, and insert a message
+	// that describes the program. The "Command description message" 
+	// is printed last in the help text. The second argument is the 
+	// delimiter (usually space) and the last one is the version number. 
+	// The CmdLine object parses the argv array based on the Arg objects
+	// that it contains. 
+    TCLAP::CmdLine cmd("Program to call variants based on kmer uniqueness", ' ', "0.1");
+
+   
+
+    //getting the working directory
+    const int SIZE=2000;
+    char buffer[SIZE];
+    char *answer = getcwd(buffer, sizeof(buffer));
+    string s_cwd;
+    if (answer)
+      {
+	s_cwd = answer;
+      }
+
+    // Define a value argument and add it to the command line.
+    // A value arg defines a flag and a type of value that it expects,
+    // such as "-n Bishop".
+
+    TCLAP::ValueArg<std::string> kmerCount("k","counts","Path to the file containing the kmer counts. File is assumed to be in two columns first column is the kmer string second column is the count",true,"foo","counts file");
+    TCLAP::ValueArg<std::string> expFastq("f","fastq","Path to the fastq file you wish to call variants in",true,"foo","fastq file");
+    TCLAP::ValueArg<std::string> kSize("s","size","The kmer size you wish to use. The default value is 30",false,"30","kmer size");
+    TCLAP::ValueArg<std::string> kCutoff("c","cutoff","The number of supporting reads required before a variant is called. The default value is 4",false,"4","count cutoff");
+    TCLAP::ValueArg<std::string> output("o","outputDir","The output directory and location to store intermediate working files. The default value is the current working directory. Intermediate working files may be large so plan accordingly.",false, s_cwd,"output dir");
+    
+    //adding in the command line arguments 
+
+    cmd.add(output);
+    cmd.add(kCutoff); 
+    cmd.add(kSize);
+    cmd.add(expFastq);
+    cmd.add(kmerCount);
+
+    // Parse the argv array.
+    cmd.parse( argc, argv );
+    
+    // Get the command line arguments
+    uniqueExpKmerCountFile = kmerCount.getValue();
+    expSeqLib=expFastq.getValue();
+    kmerSize=stoi(kSize.getValue());
+    cutoff=stoi(kCutoff.getValue());
+    outputDir=output.getValue();
+
+    
+    
+  } catch (TCLAP::ArgException &e)  // catch any exceptions
+    { std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl; }
+
+  //  return(0);
  
   //file that contains the counts of unique kmers in the experiment sequencing  library
-  uniqueExpKmerCountFile=argv[1];
+  //uniqueExpKmerCountFile=argv[1];
 
   //experiment sequencing library
-  expSeqLib=argv[2];
+  // expSeqLib=argv[2];
 
 
   //number of characters in kmer
-  kmerSize=atoi(argv[3]);
+  //  kmerSize=atoi(argv[3]);
 
    //count of number of kmers needed before calling a variant
-  cutoff=atoi(argv[4]);
+  //  cutoff=atoi(argv[4]);
 
 
   //name of outputFile that control kmers could be printed to
   //outputFile=argv[6];
 
-  outputDir=argv[5];
+  // outputDir=argv[5];
 
   //dense_hash_map<uint_fast64_t, ReadCluster *, customHash> allClusters;
 
@@ -75,6 +133,12 @@ int main(int argc, char *argv[] )
   masterKey.set_empty_key(-20);
 
 
+
+  //if trailing backslash was not added to the output directory path than add it in 
+  if(outputDir.back()!='/')
+    {
+      outputDir=(outputDir+"/");
+    }
 
   
   
