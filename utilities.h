@@ -13,6 +13,7 @@
 #include<sparsehash/sparse_hash_map>
 #include<sparsehash/dense_hash_map>
 
+#include <cmath>
 
 //#define BOOST_DYNAMIC_BITSET_DONT_USE_FRIENDS
 
