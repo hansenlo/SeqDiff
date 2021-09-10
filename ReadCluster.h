@@ -11,6 +11,7 @@
 //#include<algorithm>
 //#include <boost/algorithm/string.hpp>
 #include<math.h>
+#include<cmath>
 #include<stdint.h>
 //#include <stddef.h>
 //#include<stdio.h>

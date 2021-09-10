@@ -1009,9 +1009,9 @@ bool ReadCluster::extractVariants(std::vector<std::vector<char>> &alignmentMatri
     //go through the Ns looking for the one closest to the middle of the contig
     for(i=0; i<positionsN.size(); i++)
       {
-	if(abs(positionsN[i]-(combinedNuc.size()/2)) < smallestDist )
+	if(abs(static_cast<double>(positionsN[i]-(combinedNuc.size()/2))) < smallestDist )
 	  {
-	    smallestDist=abs(positionsN[i]-(combinedNuc.size()/2));
+	    smallestDist=abs(static_cast<double>(positionsN[i]-(combinedNuc.size()/2)));
 	    indexSmallestDist=i;
 	  }
       }

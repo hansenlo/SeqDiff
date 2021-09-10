@@ -1,16 +1,17 @@
 CC=g++
-CFLAGS=-O3 -std=c++11 -I -Wno-deprecated -I /home/hansenlo/SeqDiff/gitHubProject/SeqDiff/tclap-1.2.2/include/  -fopenmp $(DEBUG)
+CFLAGS=-O3 -std=c++11 -I -Wno-deprecated -I  /home/hansenlo/SeqDiff/gitHubProject/SeqDiff/tclap-1.2.2/include/ -fopenmp $(DEBUG)
 #CFLAGS=-std=c++11 -I -Wno-deprecated -fopenmp $(DEBUG)
-OBJS=variantFinder.o ReadCluster.o spooky.o kmerAnalysis.o utilities.o
+
+OBJS=callZygosity.o ReadCluster.o spooky.o kmerAnalysis.o utilities.o
 DEBUG=-g
 
 #DEPS=ReadCluster.h spooky.h kmerAnalysis.h utilities.h
 
-variantFinder : $(OBJS)
-	$(CC) -o variantFinder $(OBJS) $(CFLAGS) 
+callZygosity : $(OBJS)
+	$(CC) -o callZygosity $(OBJS) $(CFLAGS) 
 
-variantFinder.o: variantFinder.cpp ReadCluster.h kmerAnalysis.h utilities.h 
-	$(CC) $(CFLAGS) -c variantFinder.cpp
+callZygosity.o: callZygosity.cpp ReadCluster.h kmerAnalysis.h utilities.h 
+	$(CC) $(CFLAGS) -c callZygosity.cpp
 
 ReadCluster.o: ReadCluster.cpp ReadCluster.h spooky.h utilities.h
 	$(CC) $(CFLAGS) -c ReadCluster.cpp
