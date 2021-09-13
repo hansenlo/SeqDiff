@@ -26,6 +26,7 @@
 
 #include<fstream>
 
+#include<cmath.h>
 
 const int bitSetSize=192; //the size of bitset objects for the entire program
 
