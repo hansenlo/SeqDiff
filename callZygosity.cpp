@@ -2354,7 +2354,7 @@ void collectVcf(vector<vector<string>> &vcf, int indexVcfRecord, vector<int> &in
     
   
   //getting all vcf records with kmerSize of the variant of interest that occur before the variant
-  while( (vcf[indexVcfRecord][0]==vcf[currentIndex][0]) && (abs(position-currentPosition) < kmerSize))
+  while( (vcf[indexVcfRecord][0]==vcf[currentIndex][0]) && (abs(static_cast<double>(position-currentPosition)) < kmerSize))
     {      
       //cerr<<"adding index "<<currentIndex<<endl;
       ///cerr<<"size of vcf file is "<<sizeVcf<<endl;
@@ -3012,7 +3012,7 @@ samePositionCtr=0;
 	 if( (vcfResults[i][0]==vcfResults[i+1][0] ) )
 	   {
 	 
-	       int diff=abs((stoull(vcfResults[i][1], NULL, 10)-stoull(vcfResults[i+1][1], NULL, 10)));
+	       int diff=abs(static_cast<double>(stoull(vcfResults[i][1], NULL, 10)-stoull(vcfResults[i+1][1], NULL, 10)));
 
 	       //cerr<<"i is "<<i<<" "<<vcfResults[i][7]<<endl;
 	       //cerr<<"i+1 is "<<i+1<<" "<<vcfResults[i+1][7]<<endl;
@@ -3081,7 +3081,7 @@ samePositionCtr=0;
 		     // cerr<<"length1 is "<<length1<<endl;
 
 		     //if the position and type are the same and the lengths are within 50 bps of each other than call them the same variant
-		     diff=abs(length1-length2);
+		     diff=abs(static_cast<double>(length1-length2));
 		     if(diff<50)
 		       {
 
@@ -3420,7 +3420,7 @@ samePositionCtr=0;
 	 if( (vcf[i][0]==vcf[i+1][0] ) )
 	   {
 	 
-	       int diff=abs((stoull(vcf[i][1], NULL, 10)-stoull(vcf[i+1][1], NULL, 10)));
+	       int diff=abs(static_cast<double>(stoull(vcf[i][1], NULL, 10)-stoull(vcf[i+1][1], NULL, 10)));
 
 	       //cerr<<"i is "<<i<<" "<<vcf[i][7]<<endl;
 	       //cerr<<"i+1 is "<<i+1<<" "<<vcf[i+1][7]<<endl;
